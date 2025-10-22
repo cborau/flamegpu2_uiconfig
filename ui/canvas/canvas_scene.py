@@ -1,45 +1,247 @@
-from PySide6.QtWidgets import QGraphicsScene, QGraphicsEllipseItem, QGraphicsTextItem
-from PySide6.QtGui import QColor, QBrush
-from PySide6.QtCore import QPointF
+from typing import Dict, List, Tuple
+from PySide6.QtCore import QPointF, QRectF, Qt
+from PySide6.QtGui import QColor
+from PySide6.QtWidgets import QGraphicsScene
 from core.signals import signals
 from core.models import AgentType
+from .items import (
+    LayerBandItem, AgentNodeItem, FunctionNodeItem, ConnectionItem,
+    AGENT_R, BAND_PAD, H_SPACING
+)
+
 
 class CanvasScene(QGraphicsScene):
     def __init__(self):
         super().__init__()
-        self.setSceneRect(0, 0, 2000, 2000)
-        self.agents = []
+        self.setSceneRect(0, 0, 4000, 3000)
 
-        signals.agent_added.connect(self.add_or_replace_agent)
-        signals.agent_updated.connect(self.add_or_replace_agent)
-        signals.agent_removed.connect(self.remove_agent)
-        signals.redraw_canvas.connect(self.redraw)
+        # Data caches
+        self._agents_by_name: Dict[str, AgentType] = {}
+        self._layers: List[Dict] = []  # [{"name": str, "functions": [ "Agent::Func", ... ]}, ...]
 
-    def add_or_replace_agent(self, agent: AgentType):
-        for i, a in enumerate(self.agents):
-            if a.name == agent.name:
-                self.agents[i] = agent
-                break
-        else:
-            self.agents.append(agent)
-        self.redraw()
+        # Graphics indexes
+        self._bands: List[LayerBandItem] = []
+        self._agent_items: Dict[Tuple[str, str], AgentNodeItem] = {}    # (layer_name, agent_name) -> item
+        self._func_items: Dict[str, FunctionNodeItem] = {}              # "Agent::Func" -> item
+        self._connections: List[ConnectionItem] = []
 
-    def remove_agent(self, agent_name: str):
-        self.agents = [a for a in self.agents if a.name != agent_name]
-        self.redraw()
+        # Drag-wire state
+        self._drag_src: FunctionNodeItem | None = None
+        self._drag_temp: ConnectionItem | None = None
 
-    def redraw(self):
+        # Manual layout state
+        self.manual_mode = False
+        self._edges_by_func: dict[FunctionNodeItem, list[ConnectionItem]] = {}
+
+        # Listen to app state
+        signals.agent_added.connect(self._add_or_update_agent)
+        signals.agent_updated.connect(self._add_or_update_agent)
+        signals.agent_removed.connect(self._remove_agent)
+        signals.layers_changed.connect(self._set_layers)
+        signals.redraw_canvas.connect(self.rebuild)
+        signals.adjust_view_requested.connect(self.fit_whole_scene)
+        signals.manual_layout_toggled.connect(self._set_manual_mode)
+
+    # ----- Public helpers -----------------------------------------------------
+    def fit_whole_scene(self):
+        # The QGraphicsView handles fitInView via a slot. Nothing to do here.
+        pass
+
+    # ----- Signals handlers ---------------------------------------------------
+    def _set_manual_mode(self, enabled: bool):
+        self.manual_mode = enabled
+        # toggle movability of nodes
+        for (_, _), ag_item in self._agent_items.items():
+            ag_item.set_movable(enabled)
+        for fn_item in self._func_items.values():
+            fn_item.set_movable(enabled)
+        # when turning OFF, snap back to auto layout
+        if not enabled:
+            self.rebuild()
+
+    def _add_or_update_agent(self, a: AgentType):
+        self._agents_by_name[a.name] = a
+        self.rebuild()
+
+    def _remove_agent(self, name: str):
+        if name in self._agents_by_name:
+            del self._agents_by_name[name]
+        # purge any functions in layers referencing this agent
+        for L in self._layers:
+            L["functions"] = [f for f in L["functions"] if not f.startswith(f"{name}::")]
+        self.rebuild()
+
+    def _set_layers(self, layers_list: List[Dict]):
+        self._layers = layers_list or []
+        self.rebuild()
+
+    # ----- Rebuild layout -----------------------------------------------------
+    def rebuild(self):
         self.clear()
-        x, y = 80, 80
-        for agent in self.agents:
-            self.draw_agent(agent.name, QColor(agent.color), x, y)
-            y += 120
+        self._clear_edge_registry()
+        self._bands.clear()
+        self._agent_items.clear()
+        self._func_items.clear()
+        self._connections.clear()
 
-    def draw_agent(self, name, color, x, y):
-        circle = QGraphicsEllipseItem(x, y, 40, 40)
-        circle.setBrush(QBrush(color))
-        self.addItem(circle)
+        if not self._layers:
+            return
 
-        label = QGraphicsTextItem(name)
-        label.setPos(QPointF(x, y + 45))
-        self.addItem(label)
+        # Simple vertical stacking of layer bands
+        y = 40.0
+        band_h = 220.0
+        left, right = 40.0, 3600.0
+
+        for L in self._layers:
+            rect = QRectF(left, y, right - left, band_h)
+            band = LayerBandItem(L["name"], rect)
+            self.addItem(band)
+            self._bands.append(band)
+
+            # Which agents are present in this layer?
+            funcs = [f for f in L.get("functions", []) if "::" in f]
+            agents_here: List[str] = []
+            for f in funcs:
+                ag_name, _ = f.split("::", 1)
+                if ag_name not in agents_here:
+                    agents_here.append(ag_name)
+
+            # Horizontal placement of agents
+            if agents_here:
+                x = rect.left() + BAND_PAD + AGENT_R
+                center_y = rect.center().y() - 12.0
+                for ag_name in agents_here:
+                    ag = self._agents_by_name.get(ag_name)
+                    if not ag:
+                        continue
+
+                    # Agent circle
+                    ag_item = AgentNodeItem(ag_name, QColor(ag.color))
+                    ag_item.setPos(QPointF(x, center_y))
+                    self.addItem(ag_item)
+                    self._agent_items[(L["name"], ag_name)] = ag_item
+                    ag_item.set_movable(self.manual_mode)
+
+                    # Functions belonging to this agent in this layer
+                    f_for_agent = [f for f in funcs if f.startswith(f"{ag_name}::")]
+
+                    # Create all function items first so we know their sizes
+                    fn_items: List[FunctionNodeItem] = []
+                    for f_id in f_for_agent:
+                        f_name = f_id.split("::", 1)[1]
+                        f_meta = next((ff for ff in ag.functions if ff.name == f_name), None)
+                        if not f_meta:
+                            continue
+                        fn_item = FunctionNodeItem(ag_name, f_name, f_meta.input_type, f_meta.output_type)
+                        self.addItem(fn_item)
+                        self._func_items[f"{ag_name}::{f_name}"] = fn_item
+                        fn_item.on_moved = self._on_func_moved
+                        self._edges_by_func.setdefault(fn_item, [])
+                        fn_item.set_movable(self.manual_mode)
+                        fn_items.append(fn_item)
+
+                    # Position function items to the right, tightly and without overlap
+                    if fn_items:
+                        # left edge for rectangles clear of the circle
+                        base_left = x + AGENT_R + 24.0    # gap from circle
+                        total_h = sum(it.rect().height() for it in fn_items) + 6.0 * (len(fn_items) - 1)
+                        cur_y = center_y - total_h * 0.5
+                        max_w = 0.0
+                        for it in fn_items:
+                            w = it.rect().width()
+                            h = it.rect().height()
+                            max_w = max(max_w, w)
+                            # set center so that left edge stays at base_left + inner gap
+                            inner_gap = 8.0
+                            it.setPos(QPointF(base_left + inner_gap + w * 0.5, cur_y + h * 0.5))
+                            cur_y += h + 6.0
+
+                        # Advance x according to the widest function box so we don't collide with next agent
+                        x += max(
+                            H_SPACING,
+                            2 * AGENT_R + 160.0,
+                            (AGENT_R + 24.0) + max_w + 200.0
+                        )
+                    else:
+                        x += max(H_SPACING, 2 * AGENT_R + 160.0)
+
+            y += band_h + 30.0
+
+        # Enable interactive wiring
+        self.installEventFilter(self)
+
+    # ----- Interaction: drag-to-connect with type checking -------------------
+    def mousePressEvent(self, event):
+        if self.manual_mode:
+            return super().mousePressEvent(event)
+        super().mousePressEvent(event)
+        item = self.itemAt(event.scenePos(), self.views()[0].transform()) if self.views() else None
+        if isinstance(item, FunctionNodeItem):
+            # start drag from this function's output
+            self._drag_src = item
+            # create a temporary connection to follow the mouse
+            self._drag_temp = ConnectionItem(item, item)
+            self.addItem(self._drag_temp)
+
+    def mouseMoveEvent(self, event):
+        if self._drag_temp and self._drag_src:
+            # update temp path to current mouse as 'dst'
+            fake_dst = type(self._drag_src)(
+                self._drag_src.owner_agent, self._drag_src.func_name,
+                self._drag_src.in_type, self._drag_src.out_type
+            )
+            fake_dst.setPos(event.scenePos())
+            self._drag_temp.dst = fake_dst
+            self._drag_temp._rebuild_path()
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if self._drag_src and self._drag_temp:
+            # resolve drop target
+            drop_item = self.itemAt(event.scenePos(), self.views()[0].transform()) if self.views() else None
+            if isinstance(drop_item, FunctionNodeItem) and drop_item is not self._drag_src:
+                # Validate types: src.out == dst.in
+                if self._drag_src.out_type == drop_item.in_type:
+                    conn = ConnectionItem(self._drag_src, drop_item)
+                    self.addItem(conn)
+                    self._connections.append(conn)
+                    # register both ends so we can refresh on move
+                    self._edges_by_func.setdefault(self._drag_src, []).append(conn)
+                    self._edges_by_func.setdefault(drop_item, []).append(conn)
+
+                    signals.connection_added.emit({
+                        "src": self._drag_src.id_str,
+                        "dst": drop_item.id_str,
+                        "type": self._drag_src.out_type
+                    })
+                else:
+                    # (optional) visual feedback on type mismatch
+                    pass
+            # cleanup temp
+            self.removeItem(self._drag_temp)
+            self._drag_temp = None
+            self._drag_src = None
+        super().mouseReleaseEvent(event)
+
+    # Delete selected connections with Delete key
+    def keyPressEvent(self, event):
+        if event.key() in (Qt.Key_Delete, Qt.Key_Backspace):
+            for it in list(self.selectedItems()):
+                if isinstance(it, ConnectionItem):
+                    signals.connection_removed.emit({
+                        "src": it.src.id_str,
+                        "dst": it.dst.id_str,
+                        "type": it.src.out_type
+                    })
+                    self.removeItem(it)
+                    if it in self._connections:
+                        self._connections.remove(it)
+        super().keyPressEvent(event)
+
+    # ----- Edge maintenance ---------------------------------------------------
+    def _on_func_moved(self, fn_item: FunctionNodeItem):
+        for edge in self._edges_by_func.get(fn_item, []):
+            edge._rebuild_path()
+
+    def _clear_edge_registry(self):
+        self._edges_by_func.clear()
