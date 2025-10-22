@@ -1,11 +1,36 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QLineEdit, QColorDialog,QHBoxLayout, QTableWidget, QTableWidgetItem, QComboBox, QMessageBox
+from PySide6.QtWidgets import (
+    QWidget, QVBoxLayout, QLabel, QPushButton, QLineEdit, QColorDialog,
+    QHBoxLayout, QTableWidget, QTableWidgetItem, QComboBox, QMessageBox,
+    QAbstractItemView
+)
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QIcon, QColor
+from core.models import AgentType, AgentVariable, AgentFunction
+from core.signals import signals
 
 class AgentConfigTab(QWidget):
     def __init__(self):
         super().__init__()
 
+        # Color palette (cycled if user doesn’t pick one)
+        self.default_colors = [
+            "#e6194B", "#3cb44b", "#ffe119", "#4363d8", "#f58231",
+            "#911eb4", "#46f0f0", "#f032e6", "#bcf60c", "#fabebe"
+        ]
+
+        # Local storage of created templates (by name)
+        self.agent_templates = {}
+        # Edit state
+        self.edit_mode = False
+        self.editing_original_name = None
+
+        self.template_combo = QComboBox()
+        self.template_combo.addItem("-- Select Template --")
+        self.template_combo.currentTextChanged.connect(self.load_template)
+
         layout = QVBoxLayout(self)
+        layout.addWidget(QLabel("Template:"))
+        layout.addWidget(self.template_combo)
 
         layout.addWidget(QLabel("Agent Name:"))
         self.name_edit = QLineEdit()
@@ -20,9 +45,14 @@ class AgentConfigTab(QWidget):
         layout.addLayout(color_btn_layout)
 
         layout.addWidget(QLabel("Variables (name + default):"))
-        self.vars_table = QTableWidget(0, 2)
-        self.vars_table.setHorizontalHeaderLabels(["Variable", "Default Value"])
+        self.vars_table = QTableWidget(0, 3)
+        self.vars_table.setHorizontalHeaderLabels(["Variable", "Default Value", ""])
+        self.vars_table.setEditTriggers(QAbstractItemView.AllEditTriggers)
         layout.addWidget(self.vars_table)
+
+        add_var_btn = QPushButton("Add Variable")
+        add_var_btn.clicked.connect(self.add_variable_row)
+        layout.addWidget(add_var_btn)
 
         layout.addWidget(QLabel("Functions:"))
         self.funcs_table = QTableWidget(0, 4)
@@ -38,6 +68,24 @@ class AgentConfigTab(QWidget):
         layout.addWidget(self.save_btn)
 
         self.selected_color = None
+        self.populate_default_variables()
+
+    # ---------- Helpers ----------
+    def reset_fields(self):
+        self.name_edit.clear()
+        self.color_label.setText("None")
+        self.color_label.setStyleSheet("")
+        self.selected_color = None
+        self.vars_table.setRowCount(0)
+        self.funcs_table.setRowCount(0)
+        self.populate_default_variables()
+        self.edit_mode = False
+        self.editing_original_name = None
+        self.save_btn.setText("Save Agent Type")
+
+    def populate_default_variables(self):
+        for var in ["x", "y", "z", "vx", "vy", "vz"]:
+            self.add_variable_row(var, "0.0")
 
     def choose_color(self):
         color = QColorDialog.getColor()
@@ -45,6 +93,19 @@ class AgentConfigTab(QWidget):
             self.selected_color = color
             self.color_label.setText(color.name())
             self.color_label.setStyleSheet(f"background-color: {color.name()}")
+
+    def add_variable_row(self, name="", default=""):
+        row = self.vars_table.rowCount()
+        self.vars_table.insertRow(row)
+        self.vars_table.setItem(row, 0, QTableWidgetItem(name))
+        self.vars_table.setItem(row, 1, QTableWidgetItem(default))
+        btn = QPushButton()
+        btn.setIcon(QIcon.fromTheme("edit-delete"))
+        btn.clicked.connect(lambda _, r=row: self.remove_variable_row(r))
+        self.vars_table.setCellWidget(row, 2, btn)
+
+    def remove_variable_row(self, row):
+        self.vars_table.removeRow(row)
 
     def add_function_row(self):
         row = self.funcs_table.rowCount()
@@ -57,23 +118,111 @@ class AgentConfigTab(QWidget):
             else:
                 self.funcs_table.setItem(row, col, QTableWidgetItem(""))
 
+    # ---------- Template loading ----------
+    def load_template(self, template_name):
+        if template_name == "-- Select Template --":
+            return
+        agent = self.agent_templates.get(template_name)
+        if not agent:
+            return
+
+        self.name_edit.setText("")
+        self.color_label.setText(agent.color)
+        self.color_label.setStyleSheet(f"background-color: {agent.color}")
+        self.selected_color = QColor(agent.color)
+
+        self.vars_table.setRowCount(0)
+        for var in agent.variables:
+            self.add_variable_row(var.name, var.default)
+
+        self.funcs_table.setRowCount(0)
+        for func in agent.functions:
+            self.add_function_row()
+            row = self.funcs_table.rowCount() - 1
+            self.funcs_table.setItem(row, 0, QTableWidgetItem(func.name))
+            self.funcs_table.setItem(row, 1, QTableWidgetItem(func.description))
+            self.funcs_table.cellWidget(row, 2).setCurrentText(func.input_type)
+            self.funcs_table.cellWidget(row, 3).setCurrentText(func.output_type)
+
+    # ---------- Edit mode ----------
+    def load_agent_for_edit(self, agent: AgentType):
+        """Prefill fields to edit an existing agent."""
+        self.edit_mode = True
+        self.editing_original_name = agent.name
+        self.save_btn.setText("Save Changes")
+
+        self.name_edit.setText(agent.name)
+        self.selected_color = QColor(agent.color)
+        self.color_label.setText(agent.color)
+        self.color_label.setStyleSheet(f"background-color: {agent.color}")
+
+        self.vars_table.setRowCount(0)
+        for v in agent.variables:
+            self.add_variable_row(v.name, v.default)
+
+        self.funcs_table.setRowCount(0)
+        for f in agent.functions:
+            self.add_function_row()
+            row = self.funcs_table.rowCount() - 1
+            self.funcs_table.setItem(row, 0, QTableWidgetItem(f.name))
+            self.funcs_table.setItem(row, 1, QTableWidgetItem(f.description))
+            self.funcs_table.cellWidget(row, 2).setCurrentText(f.input_type)
+            self.funcs_table.cellWidget(row, 3).setCurrentText(f.output_type)
+
+    # ---------- Save ----------
     def save_agent_type(self):
         name = self.name_edit.text().strip()
         if not name:
             QMessageBox.warning(self, "Validation", "Agent name cannot be empty")
             return
 
-        print(f"Saving Agent '{name}' with color {self.selected_color.name() if self.selected_color else 'None'}")
-        print("Variables:")
+        variables = []
         for row in range(self.vars_table.rowCount()):
-            var = self.vars_table.item(row, 0).text()
-            val = self.vars_table.item(row, 1).text()
-            print(f"  {var} = {val}")
+            var_item = self.vars_table.item(row, 0)
+            val_item = self.vars_table.item(row, 1)
+            if not var_item:
+                continue
+            variables.append(AgentVariable(var_item.text(), val_item.text() if val_item else ""))
 
-        print("Functions:")
+        functions = []
         for row in range(self.funcs_table.rowCount()):
-            name_item = self.funcs_table.item(row, 0).text()
-            desc_item = self.funcs_table.item(row, 1).text()
-            input_type = self.funcs_table.cellWidget(row, 2).currentText()
-            output_type = self.funcs_table.cellWidget(row, 3).currentText()
-            print(f"  {name_item} ({input_type} -> {output_type}): {desc_item}")
+            fname_item = self.funcs_table.item(row, 0)
+            fdesc_item = self.funcs_table.item(row, 1)
+            in_combo = self.funcs_table.cellWidget(row, 2)
+            out_combo = self.funcs_table.cellWidget(row, 3)
+            if not fname_item:
+                continue
+            functions.append(AgentFunction(
+                fname_item.text(),
+                fdesc_item.text() if fdesc_item else "",
+                in_combo.currentText() if in_combo else "MessageNone",
+                out_combo.currentText() if out_combo else "MessageNone"
+            ))
+
+        # Default color if none picked: cycle through palette
+        if self.selected_color is None:
+            idx = len(self.agent_templates) % len(self.default_colors)
+            self.selected_color = QColor(self.default_colors[idx])
+
+        color = self.selected_color.name()
+        agent = AgentType(name, color, variables, functions)
+
+        if self.edit_mode:
+            # If the name changed, remove old key
+            if self.editing_original_name and self.editing_original_name in self.agent_templates:
+                if self.editing_original_name != name:
+                    self.agent_templates.pop(self.editing_original_name, None)
+            self.agent_templates[name] = agent
+            signals.agent_updated.emit(agent)
+            signals.redraw_canvas.emit()
+            QMessageBox.information(self, "Agent Updated", f"Agent '{name}' updated.")
+            self.reset_fields()
+        else:
+            self.agent_templates[name] = agent
+            signals.agent_added.emit(agent)
+            signals.redraw_canvas.emit()
+            QMessageBox.information(self, "Agent Saved", f"Agent '{name}' created.")
+            # Add as selectable template for reuse
+            if self.template_combo.findText(name) == -1:
+                self.template_combo.addItem(name)
+            self.reset_fields()

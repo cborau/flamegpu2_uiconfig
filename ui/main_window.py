@@ -5,6 +5,7 @@ from ui.tabs.globals_tab import GlobalsTab
 from ui.tabs.layers_tab import LayersTab
 from ui.tabs.model_tab import ModelTab
 from ui.canvas.canvas_view import CanvasView
+from core.signals import signals
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -14,14 +15,20 @@ class MainWindow(QMainWindow):
 
         splitter = QSplitter(Qt.Horizontal)
 
-        # Left panel with tabs
+        # Left panel with tabs (keep references!)
         self.tab_widget = QTabWidget()
-        self.tab_widget.setMinimumWidth(400)
+        self.tab_widget.setMinimumWidth(420)
         self.tab_widget.setTabPosition(QTabWidget.North)
-        self.tab_widget.addTab(AgentConfigTab(), "Agent Config.")
-        self.tab_widget.addTab(GlobalsTab(), "Globals")
-        self.tab_widget.addTab(LayersTab(), "Layers")
-        self.tab_widget.addTab(ModelTab(), "Model")
+
+        self.agent_config_tab = AgentConfigTab()
+        self.globals_tab = GlobalsTab()
+        self.layers_tab = LayersTab()
+        self.model_tab = ModelTab()
+
+        self.tab_widget.addTab(self.agent_config_tab, "Agent Config.")
+        self.tab_widget.addTab(self.globals_tab, "Globals")
+        self.tab_widget.addTab(self.layers_tab, "Layers")
+        self.tab_widget.addTab(self.model_tab, "Model")
 
         left_panel = QWidget()
         left_layout = QVBoxLayout()
@@ -33,6 +40,13 @@ class MainWindow(QMainWindow):
 
         splitter.addWidget(left_panel)
         splitter.addWidget(self.canvas)
-        splitter.setSizes([450, 950])  # 1/3 - 2/3
+        splitter.setSizes([500, 900])  # ~1/3 - 2/3
 
         self.setCentralWidget(splitter)
+
+        # When the Model tab requests to edit, open Agent Config prefilled
+        signals.request_edit_agent.connect(self._open_edit_agent)
+
+    def _open_edit_agent(self, agent):
+        self.tab_widget.setCurrentWidget(self.agent_config_tab)
+        self.agent_config_tab.load_agent_for_edit(agent)
