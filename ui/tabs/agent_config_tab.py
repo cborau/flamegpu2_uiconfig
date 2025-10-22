@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QLineEdit, QColorDialog,
     QHBoxLayout, QTableWidget, QTableWidgetItem, QComboBox, QMessageBox,
-    QAbstractItemView
+    QAbstractItemView, QHeaderView
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QIcon, QColor
@@ -48,6 +48,8 @@ class AgentConfigTab(QWidget):
         self.vars_table = QTableWidget(0, 3)
         self.vars_table.setHorizontalHeaderLabels(["Variable", "Default Value", ""])
         self.vars_table.setEditTriggers(QAbstractItemView.AllEditTriggers)
+        self.vars_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        self.vars_table.horizontalHeader().setStretchLastSection(False)
         layout.addWidget(self.vars_table)
 
         add_var_btn = QPushButton("Add Variable")
@@ -55,8 +57,10 @@ class AgentConfigTab(QWidget):
         layout.addWidget(add_var_btn)
 
         layout.addWidget(QLabel("Functions:"))
-        self.funcs_table = QTableWidget(0, 4)
-        self.funcs_table.setHorizontalHeaderLabels(["Name", "Description", "Input", "Output"])
+        self.funcs_table = QTableWidget(0, 5)
+        self.funcs_table.setHorizontalHeaderLabels(["Name", "Description", "Input", "Output", ""])
+        self.funcs_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
+        self.funcs_table.horizontalHeader().setStretchLastSection(False)
         layout.addWidget(self.funcs_table)
 
         add_func_btn = QPushButton("Add Function")
@@ -99,13 +103,12 @@ class AgentConfigTab(QWidget):
         self.vars_table.insertRow(row)
         self.vars_table.setItem(row, 0, QTableWidgetItem(name))
         self.vars_table.setItem(row, 1, QTableWidgetItem(default))
-        btn = QPushButton()
-        btn.setIcon(QIcon.fromTheme("edit-delete"))
-        btn.clicked.connect(lambda _, r=row: self.remove_variable_row(r))
+        btn = self._make_delete_button(self.vars_table)
+        btn.clicked.connect(lambda _, b=btn: self.remove_variable_row(b))
         self.vars_table.setCellWidget(row, 2, btn)
 
-    def remove_variable_row(self, row):
-        self.vars_table.removeRow(row)
+    def remove_variable_row(self, button):
+        self._remove_table_row(self.vars_table, button)
 
     def add_function_row(self):
         row = self.funcs_table.rowCount()
@@ -117,6 +120,28 @@ class AgentConfigTab(QWidget):
                 self.funcs_table.setCellWidget(row, col, combo)
             else:
                 self.funcs_table.setItem(row, col, QTableWidgetItem(""))
+        btn = self._make_delete_button(self.funcs_table)
+        btn.clicked.connect(lambda _, b=btn: self.remove_function_row(b))
+        self.funcs_table.setCellWidget(row, 4, btn)
+
+    def remove_function_row(self, button):
+        self._remove_table_row(self.funcs_table, button)
+
+    def _make_delete_button(self, table):
+        btn = QPushButton()
+        icon = QIcon.fromTheme("edit-delete")
+        if icon.isNull():
+            btn.setText("🗑")
+        else:
+            btn.setIcon(icon)
+        return btn
+
+    def _remove_table_row(self, table, button):
+        for r in range(table.rowCount()):
+            for c in range(table.columnCount()):
+                if table.cellWidget(r, c) is button:
+                    table.removeRow(r)
+                    return
 
     # ---------- Template loading ----------
     def load_template(self, template_name):

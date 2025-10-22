@@ -49,7 +49,21 @@ class LayersTab(QWidget):
         for layer in self.layer_store:
             layer["functions"] = [f for f in layer["functions"] if not f.startswith(f"{agent_name}::")]
         self.refresh_layer_table()
-        self.refresh_function_list([])
+
+        if not self.layer_store:
+            self.current_layer_index = -1
+            self.refresh_function_list([])
+            return
+
+        if self.current_layer_index >= len(self.layer_store):
+            self.current_layer_index = len(self.layer_store) - 1
+
+        selected_funcs = []
+        if 0 <= self.current_layer_index < len(self.layer_store):
+            selected_funcs = self.layer_store[self.current_layer_index]["functions"]
+            self.layer_table.selectRow(self.current_layer_index)
+
+        self.refresh_function_list(selected_funcs)
 
     def add_layer(self):
         name = self.layer_name_edit.text().strip()
