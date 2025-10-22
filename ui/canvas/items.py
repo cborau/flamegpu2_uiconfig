@@ -1,8 +1,6 @@
 from PySide6.QtCore import QRectF, QPointF, Qt
-from PySide6.QtGui import QPainter, QPolygonF
-from PySide6.QtGui import QBrush, QColor, QPainterPath, QPen, QPainter, QPolygonF
+from PySide6.QtGui import QBrush, QColor, QPainter, QPainterPath, QPen, QPolygonF
 from PySide6.QtWidgets import QGraphicsItem, QGraphicsPathItem, QGraphicsRectItem, QGraphicsSimpleTextItem
-from PySide6.QtGui import QPainter
 
 PORT_R = 5.0
 AGENT_R = 24.0
@@ -32,6 +30,8 @@ class AgentNodeItem(QGraphicsItem):
         self.label.setPos(-AGENT_R, AGENT_R + 6)
         self.setFlag(QGraphicsItem.ItemIsSelectable, True)
         self.setAcceptHoverEvents(True)
+        self.setFlag(QGraphicsItem.ItemSendsGeometryChanges, True)
+        self.on_moved = None
 
     def boundingRect(self) -> QRectF:
         r = self._rect.adjusted(-3, -3, 3, 18)
@@ -46,6 +46,14 @@ class AgentNodeItem(QGraphicsItem):
     
     def set_movable(self, flag: bool):
         self.setFlag(QGraphicsItem.ItemIsMovable, flag)
+
+    def port_pos_out(self) -> QPointF:
+        return self.mapToScene(QPointF(self._rect.right(), 0.0))
+
+    def itemChange(self, change, value):
+        if change == QGraphicsItem.ItemPositionHasChanged and self.on_moved:
+            self.on_moved(self)
+        return super().itemChange(change, value)
 
 
 class FunctionNodeItem(QGraphicsRectItem):
@@ -91,11 +99,15 @@ class FunctionNodeItem(QGraphicsRectItem):
 
     def port_pos_in(self) -> QPointF:
         r = self.rect()
-        return self.mapToScene(QPointF(r.left(), 0.0))
+        return self.mapToScene(QPointF(0.0, r.top()))
 
     def port_pos_out(self) -> QPointF:
         r = self.rect()
-        return self.mapToScene(QPointF(r.right(), 0.0))
+        return self.mapToScene(QPointF(0.0, r.bottom()))
+
+    def port_pos_agent(self) -> QPointF:
+        r = self.rect()
+        return self.mapToScene(QPointF(r.left(), 0.0))
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.ItemPositionHasChanged and self.on_moved:
@@ -120,9 +132,9 @@ class ConnectionItem(QGraphicsPathItem):
     def _rebuild_path(self):
         p0 = self.src.port_pos_out()
         p1 = self.dst.port_pos_in()
-        dx = max(40.0, 0.5 * (p1.x() - p0.x()))
-        c0 = QPointF(p0.x() + dx, p0.y())
-        c1 = QPointF(p1.x() - dx, p1.y())
+        dy = max(40.0, abs(p1.y() - p0.y()) * 0.5)
+        c0 = QPointF(p0.x(), p0.y() + dy)
+        c1 = QPointF(p1.x(), p1.y() - dy)
 
         path = QPainterPath(p0)
         path.cubicTo(c0, c1, p1)
@@ -133,6 +145,8 @@ class ConnectionItem(QGraphicsPathItem):
         super().paint(p, opt, widget)
         # Arrowhead at end
         path = self.path()
+        if path.length() <= 1.0:
+            return
         end = path.pointAtPercent(1.0)
         t = path.percentAtLength(path.length() - 1.0)
         prev = path.pointAtPercent(max(0.0, t))
@@ -147,4 +161,49 @@ class ConnectionItem(QGraphicsPathItem):
         c = end - v * s - left * (s*0.6)
         arrow_poly = QPolygonF([a, b, c])
         p.setBrush(QBrush(QColor("#8ad")))
+        p.drawPolygon(arrow_poly)
+
+
+class AgentConnectionItem(QGraphicsPathItem):
+    """Arrow linking an agent circle to one of its function rectangles."""
+
+    def __init__(self, agent_item: AgentNodeItem, func_item: FunctionNodeItem, color: QColor):
+        super().__init__()
+        self.agent = agent_item
+        self.func = func_item
+        self.color = color
+        self.setZValue(-2)
+        self.setPen(QPen(color, 2.0))
+        self.setFlag(QGraphicsItem.ItemIsSelectable, False)
+        self._rebuild_path()
+
+    def _rebuild_path(self):
+        start = self.agent.port_pos_out()
+        end = self.func.port_pos_agent()
+        dx = max(40.0, abs(end.x() - start.x()) * 0.5)
+        c0 = QPointF(start.x() + dx, start.y())
+        c1 = QPointF(end.x() - dx, end.y())
+
+        path = QPainterPath(start)
+        path.cubicTo(c0, c1, end)
+        self.setPath(path)
+
+    def paint(self, p, opt, widget=None):
+        super().paint(p, opt, widget)
+        path = self.path()
+        if path.length() <= 1.0:
+            return
+        end = path.pointAtPercent(1.0)
+        t = path.percentAtLength(path.length() - 1.0)
+        prev = path.pointAtPercent(max(0.0, t))
+        v = (end - prev)
+        if v.manhattanLength() > 0.0001:
+            v /= (v.manhattanLength())
+        left = QPointF(-v.y(), v.x())
+        s = 8.0
+        a = end
+        b = end - v * s + left * (s * 0.6)
+        c = end - v * s - left * (s * 0.6)
+        arrow_poly = QPolygonF([a, b, c])
+        p.setBrush(QBrush(self.color))
         p.drawPolygon(arrow_poly)

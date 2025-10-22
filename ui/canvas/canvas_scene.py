@@ -5,7 +5,7 @@ from PySide6.QtWidgets import QGraphicsScene
 from core.signals import signals
 from core.models import AgentType
 from .items import (
-    LayerBandItem, AgentNodeItem, FunctionNodeItem, ConnectionItem,
+    LayerBandItem, AgentNodeItem, FunctionNodeItem, ConnectionItem, AgentConnectionItem,
     AGENT_R, BAND_PAD, H_SPACING
 )
 
@@ -22,8 +22,9 @@ class CanvasScene(QGraphicsScene):
         # Graphics indexes
         self._bands: List[LayerBandItem] = []
         self._agent_items: Dict[Tuple[str, str], AgentNodeItem] = {}    # (layer_name, agent_name) -> item
-        self._func_items: Dict[str, FunctionNodeItem] = {}              # "Agent::Func" -> item
+        self._func_items: Dict[str, List[FunctionNodeItem]] = {}         # "Agent::Func" -> [items]
         self._connections: List[ConnectionItem] = []
+        self._agent_connections: List[AgentConnectionItem] = []
 
         # Drag-wire state
         self._drag_src: FunctionNodeItem | None = None
@@ -32,6 +33,7 @@ class CanvasScene(QGraphicsScene):
         # Manual layout state
         self.manual_mode = False
         self._edges_by_func: dict[FunctionNodeItem, list[ConnectionItem]] = {}
+        self._edges_by_agent: dict[AgentNodeItem, list[AgentConnectionItem]] = {}
 
         # Listen to app state
         signals.agent_added.connect(self._add_or_update_agent)
@@ -53,8 +55,9 @@ class CanvasScene(QGraphicsScene):
         # toggle movability of nodes
         for (_, _), ag_item in self._agent_items.items():
             ag_item.set_movable(enabled)
-        for fn_item in self._func_items.values():
-            fn_item.set_movable(enabled)
+        for items in self._func_items.values():
+            for fn_item in items:
+                fn_item.set_movable(enabled)
         # when turning OFF, snap back to auto layout
         if not enabled:
             self.rebuild()
@@ -121,6 +124,8 @@ class CanvasScene(QGraphicsScene):
                     self.addItem(ag_item)
                     self._agent_items[(L["name"], ag_name)] = ag_item
                     ag_item.set_movable(self.manual_mode)
+                    ag_item.on_moved = self._on_agent_moved
+                    self._edges_by_agent.setdefault(ag_item, [])
 
                     # Functions belonging to this agent in this layer
                     f_for_agent = [f for f in funcs if f.startswith(f"{ag_name}::")]
@@ -134,7 +139,7 @@ class CanvasScene(QGraphicsScene):
                             continue
                         fn_item = FunctionNodeItem(ag_name, f_name, f_meta.input_type, f_meta.output_type)
                         self.addItem(fn_item)
-                        self._func_items[f"{ag_name}::{f_name}"] = fn_item
+                        self._func_items.setdefault(f"{ag_name}::{f_name}", []).append(fn_item)
                         fn_item.on_moved = self._on_func_moved
                         self._edges_by_func.setdefault(fn_item, [])
                         fn_item.set_movable(self.manual_mode)
@@ -156,6 +161,14 @@ class CanvasScene(QGraphicsScene):
                             it.setPos(QPointF(base_left + inner_gap + w * 0.5, cur_y + h * 0.5))
                             cur_y += h + 6.0
 
+                        # Draw colored connectors from agent to each function box
+                        for it in fn_items:
+                            link = AgentConnectionItem(ag_item, it, QColor(ag.color))
+                            self.addItem(link)
+                            self._agent_connections.append(link)
+                            self._edges_by_agent[ag_item].append(link)
+                            self._edges_by_func[it].append(link)
+
                         # Advance x according to the widest function box so we don't collide with next agent
                         x += max(
                             H_SPACING,
@@ -175,8 +188,8 @@ class CanvasScene(QGraphicsScene):
         if self.manual_mode:
             return super().mousePressEvent(event)
         super().mousePressEvent(event)
-        item = self.itemAt(event.scenePos(), self.views()[0].transform()) if self.views() else None
-        if isinstance(item, FunctionNodeItem):
+        item = self._function_node_at(event.scenePos())
+        if item:
             # start drag from this function's output
             self._drag_src = item
             # create a temporary connection to follow the mouse
@@ -198,8 +211,8 @@ class CanvasScene(QGraphicsScene):
     def mouseReleaseEvent(self, event):
         if self._drag_src and self._drag_temp:
             # resolve drop target
-            drop_item = self.itemAt(event.scenePos(), self.views()[0].transform()) if self.views() else None
-            if isinstance(drop_item, FunctionNodeItem) and drop_item is not self._drag_src:
+            drop_item = self._function_node_at(event.scenePos())
+            if drop_item and drop_item is not self._drag_src:
                 # Validate types: src.out == dst.in
                 if self._drag_src.out_type == drop_item.in_type:
                     conn = ConnectionItem(self._drag_src, drop_item)
@@ -243,5 +256,19 @@ class CanvasScene(QGraphicsScene):
         for edge in self._edges_by_func.get(fn_item, []):
             edge._rebuild_path()
 
+    def _on_agent_moved(self, agent_item: AgentNodeItem):
+        for edge in self._edges_by_agent.get(agent_item, []):
+            edge._rebuild_path()
+
     def _clear_edge_registry(self):
         self._edges_by_func.clear()
+        self._edges_by_agent.clear()
+        self._agent_connections.clear()
+
+    def _function_node_at(self, pos: QPointF) -> FunctionNodeItem | None:
+        if not self.views():
+            return None
+        item = self.itemAt(pos, self.views()[0].transform())
+        while item and not isinstance(item, FunctionNodeItem):
+            item = item.parentItem()
+        return item if isinstance(item, FunctionNodeItem) else None
