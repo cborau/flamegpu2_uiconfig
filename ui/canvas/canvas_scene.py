@@ -93,6 +93,13 @@ class CanvasScene(QGraphicsScene):
         self._layer_heights = {
             name: height for name, height in self._layer_heights.items() if name in layer_names
         }
+        for layer in self._layers:
+            name = layer.get("name")
+            if not name:
+                continue
+            height_val = layer.get("height")
+            if isinstance(height_val, (int, float)) and height_val > 0:
+                self._layer_heights[name] = float(height_val)
         self.rebuild()
 
     # ----- Rebuild layout -----------------------------------------------------
@@ -297,6 +304,7 @@ class CanvasScene(QGraphicsScene):
         clamped = max(min_height, new_height)
         self._layer_heights[layer_name] = clamped
         self._update_layer_band_layout()
+        signals.layer_height_changed.emit(layer_name, clamped)
 
     def _update_layer_band_layout(self):
         if not self._bands or not self._layers:

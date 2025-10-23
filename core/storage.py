@@ -29,7 +29,7 @@ def load_config(filename):
         func_ids = l.get("function_ids")
         if func_ids is None:
             func_ids = l.get("functions", [])
-        layers.append(Layer(l.get("name", "Layer"), list(func_ids)))
+        layers.append(Layer(l.get("name", "Layer"), list(func_ids), l.get("height")))
 
     globals_ = []
     for g in data.get("globals", []):

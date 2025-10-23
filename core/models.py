@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Optional
 
 @dataclass
 class AgentVariable:
@@ -24,6 +24,7 @@ class AgentType:
 class Layer:
     name: str
     function_ids: List[str] = field(default_factory=list)
+    height: Optional[float] = None
 
 @dataclass
 class GlobalVariable:

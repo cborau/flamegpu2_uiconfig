@@ -7,7 +7,8 @@ class SignalBus(QObject):
     agent_removed = Signal(str)            # Emits agent name
 
     # Layers & globals
-    layers_changed = Signal(list)          # Emits List[{"name": str, "functions": List[str]}]
+    layers_changed = Signal(list)          # Emits List[{"name": str, "functions": List[str], "height": Optional[float]}]
+    layer_height_changed = Signal(str, float)
     layer_updated = Signal()               # (kept for compatibility)
     globals_updated = Signal()
 

@@ -44,7 +44,7 @@ class LayersTab(QWidget):
         self.add_btn.clicked.connect(self.add_layer)
         layout.addWidget(self.add_btn)
 
-        self.layer_store = []  # list of dicts {name, functions}
+        self.layer_store = []  # list of dicts {name, functions, height}
         self.functions = []    # list of all available "Agent::Function"
         self.current_layer_index = -1
         self._updating_layer_table = False
@@ -53,6 +53,7 @@ class LayersTab(QWidget):
         signals.agent_added.connect(self.receive_agent)
         signals.agent_updated.connect(self.receive_agent)
         signals.agent_removed.connect(self.remove_agent_functions)
+        signals.layer_height_changed.connect(self.update_layer_height)
 
     # --- Functions inventory from agents ---
     def receive_agent(self, agent):
@@ -77,7 +78,7 @@ class LayersTab(QWidget):
         if not name:
             return
         func_names = [item.text() for item in self._iter_checked_items()]
-        self.layer_store.append({"name": name, "functions": func_names})
+        self.layer_store.append({"name": name, "functions": func_names, "height": None})
         self.refresh_layer_table()
         self.layer_name_edit.clear()
         self.func_list.clearSelection()
@@ -111,7 +112,11 @@ class LayersTab(QWidget):
 
     def load_layers(self, layers):
         self.layer_store = [
-            {"name": layer.name, "functions": list(getattr(layer, "function_ids", getattr(layer, "functions", [])))}
+            {
+                "name": layer.name,
+                "functions": list(getattr(layer, "function_ids", getattr(layer, "functions", []))),
+                "height": getattr(layer, "height", None),
+            }
             for layer in layers
         ]
         self.current_layer_index = 0 if self.layer_store else -1
@@ -176,9 +181,22 @@ class LayersTab(QWidget):
         # Ensure UI state of the current layer is persisted before emitting
         if 0 <= self.current_layer_index < len(self.layer_store):
             self.layer_store[self.current_layer_index]["functions"] = [item.text() for item in self._iter_checked_items()]
-        signals.layers_changed.emit([{"name": L["name"], "functions": list(L["functions"])} for L in self.layer_store])
+        payload = []
+        for L in self.layer_store:
+            payload.append({
+                "name": L["name"],
+                "functions": list(L["functions"]),
+                "height": L.get("height"),
+            })
+        signals.layers_changed.emit(payload)
 
     def get_layers(self):
         if 0 <= self.current_layer_index < len(self.layer_store):
             self.layer_store[self.current_layer_index]["functions"] = [item.text() for item in self._iter_checked_items()]
-        return [Layer(layer["name"], list(layer["functions"])) for layer in self.layer_store]
+        return [Layer(layer["name"], list(layer["functions"]), layer.get("height")) for layer in self.layer_store]
+
+    def update_layer_height(self, layer_name: str, height: float):
+        for layer in self.layer_store:
+            if layer["name"] == layer_name:
+                layer["height"] = height
+                break
