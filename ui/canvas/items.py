@@ -32,6 +32,7 @@ class AgentNodeItem(QGraphicsItem):
         self.setAcceptHoverEvents(True)
         self.setFlag(QGraphicsItem.ItemSendsGeometryChanges, True)
         self.on_moved = None
+        self.layer_name = None
 
     def boundingRect(self) -> QRectF:
         r = self._rect.adjusted(-3, -3, 3, 18)
@@ -47,8 +48,14 @@ class AgentNodeItem(QGraphicsItem):
     def set_movable(self, flag: bool):
         self.setFlag(QGraphicsItem.ItemIsMovable, flag)
 
-    def port_pos_out(self) -> QPointF:
+    def port_pos_right(self) -> QPointF:
         return self.mapToScene(QPointF(self._rect.right(), 0.0))
+
+    def port_pos_left(self) -> QPointF:
+        return self.mapToScene(QPointF(self._rect.left(), 0.0))
+
+    def port_pos_out(self) -> QPointF:
+        return self.port_pos_right()
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.ItemPositionHasChanged and self.on_moved:
@@ -99,16 +106,21 @@ class FunctionNodeItem(QGraphicsRectItem):
         self.label.setPos(-br.width() / 2, -br.height() / 2)
 
     def port_pos_in(self) -> QPointF:
-        r = self.rect()
-        return self.mapToScene(QPointF(0.0, r.top()))
+        return self.port_pos_left()
 
     def port_pos_out(self) -> QPointF:
-        r = self.rect()
-        return self.mapToScene(QPointF(0.0, r.bottom()))
+        return self.port_pos_right()
 
-    def port_pos_agent(self) -> QPointF:
+    def port_pos_left(self) -> QPointF:
         r = self.rect()
         return self.mapToScene(QPointF(r.left(), 0.0))
+
+    def port_pos_right(self) -> QPointF:
+        r = self.rect()
+        return self.mapToScene(QPointF(r.right(), 0.0))
+
+    def port_pos_agent(self) -> QPointF:
+        return self.port_pos_left()
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.ItemPositionHasChanged and self.on_moved:
@@ -133,11 +145,26 @@ class ConnectionItem(QGraphicsPathItem):
         self._rebuild_path()
 
     def _rebuild_path(self):
-        p0 = self.src.port_pos_out()
-        p1 = self.dst.port_pos_in()
-        dy = max(40.0, abs(p1.y() - p0.y()) * 0.5)
-        c0 = QPointF(p0.x(), p0.y() + dy)
-        c1 = QPointF(p1.x(), p1.y() - dy)
+        src_center = self.src.scenePos()
+        dst_center = self.dst.scenePos()
+
+        if self.src is self.dst:
+            p0 = self.src.port_pos_right()
+            p1 = self.dst.port_pos_right()
+            direction = 1.0
+        elif src_center.x() <= dst_center.x():
+            p0 = self.src.port_pos_right()
+            p1 = self.dst.port_pos_left()
+            direction = 1.0
+        else:
+            p0 = self.src.port_pos_left()
+            p1 = self.dst.port_pos_right()
+            direction = -1.0
+
+        dx = max(60.0, abs(p1.x() - p0.x()) * 0.3)
+        dy = (p1.y() - p0.y()) * 0.5
+        c0 = QPointF(p0.x() + direction * dx, p0.y() + dy)
+        c1 = QPointF(p1.x() - direction * dx, p1.y() - dy)
 
         path = QPainterPath(p0)
         path.cubicTo(c0, c1, p1)
@@ -187,11 +214,22 @@ class AgentConnectionItem(QGraphicsPathItem):
         self._rebuild_path()
 
     def _rebuild_path(self):
-        start = self.agent.port_pos_out()
-        end = self.func.port_pos_agent()
+        agent_center = self.agent.scenePos()
+        func_center = self.func.scenePos()
+
+        if agent_center.x() <= func_center.x():
+            start = self.agent.port_pos_right()
+            end = self.func.port_pos_left()
+            direction = 1.0
+        else:
+            start = self.agent.port_pos_left()
+            end = self.func.port_pos_right()
+            direction = -1.0
+
         dx = max(40.0, abs(end.x() - start.x()) * 0.5)
-        c0 = QPointF(start.x() + dx, start.y())
-        c1 = QPointF(end.x() - dx, end.y())
+        dy = (end.y() - start.y()) * 0.5
+        c0 = QPointF(start.x() + direction * dx, start.y() + dy)
+        c1 = QPointF(end.x() - direction * dx, end.y() - dy)
 
         path = QPainterPath(start)
         path.cubicTo(c0, c1, end)

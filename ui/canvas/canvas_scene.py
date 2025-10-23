@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 from PySide6.QtCore import QPointF, QRectF, Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QGraphicsScene
@@ -28,6 +28,9 @@ class CanvasScene(QGraphicsScene):
         self._connection_specs: List[dict] = []
         self._connection_keys = set()
         self._connections_need_sync = False
+        self._agent_position_cache: Dict[Tuple[str, str], QPointF] = {}
+        self._func_position_cache: Dict[Tuple[Optional[str], str], QPointF] = {}
+        self._restoring_positions = False
 
         # Drag-wire state
         self._drag_src: FunctionNodeItem | None = None
@@ -61,9 +64,7 @@ class CanvasScene(QGraphicsScene):
         for items in self._func_items.values():
             for fn_item in items:
                 fn_item.set_movable(enabled)
-        # when turning OFF, snap back to auto layout
-        if not enabled:
-            self.rebuild()
+        # positions stay as-is when toggling manual mode off
 
     def _add_or_update_agent(self, a: AgentType):
         self._agents_by_name[a.name] = a
@@ -75,6 +76,12 @@ class CanvasScene(QGraphicsScene):
         # purge any functions in layers referencing this agent
         for L in self._layers:
             L["functions"] = [f for f in L["functions"] if not f.startswith(f"{name}::")]
+        self._agent_position_cache = {
+            key: pos for key, pos in self._agent_position_cache.items() if key[1] != name
+        }
+        self._func_position_cache = {
+            key: pos for key, pos in self._func_position_cache.items() if not key[1].startswith(f"{name}::")
+        }
         self.rebuild()
 
     def _set_layers(self, layers_list: List[Dict]):
@@ -129,6 +136,7 @@ class CanvasScene(QGraphicsScene):
                     self._agent_items[(L["name"], ag_name)] = ag_item
                     ag_item.set_movable(self.manual_mode)
                     ag_item.on_moved = self._on_agent_moved
+                    ag_item.layer_name = L["name"]
                     self._edges_by_agent.setdefault(ag_item, [])
 
                     # Functions belonging to this agent in this layer
@@ -186,6 +194,7 @@ class CanvasScene(QGraphicsScene):
             y += band_h + 30.0
 
         self._restore_connections_from_specs(force=True)
+        self._apply_manual_positions()
         # Enable interactive wiring
         self.installEventFilter(self)
 
@@ -209,6 +218,7 @@ class CanvasScene(QGraphicsScene):
                 self._drag_src.owner_agent, self._drag_src.func_name,
                 self._drag_src.in_type, self._drag_src.out_type
             )
+            fake_dst.layer_name = getattr(self._drag_src, "layer_name", None)
             fake_dst.setPos(event.scenePos())
             self._drag_temp.dst = fake_dst
             self._drag_temp._rebuild_path()
@@ -248,10 +258,16 @@ class CanvasScene(QGraphicsScene):
     def _on_func_moved(self, fn_item: FunctionNodeItem):
         for edge in self._edges_by_func.get(fn_item, []):
             edge._rebuild_path()
+        if (self.manual_mode or self._restoring_positions) and getattr(fn_item, "layer_name", None):
+            key = (fn_item.layer_name, fn_item.id_str)
+            self._func_position_cache[key] = fn_item.pos()
 
     def _on_agent_moved(self, agent_item: AgentNodeItem):
         for edge in self._edges_by_agent.get(agent_item, []):
             edge._rebuild_path()
+        if (self.manual_mode or self._restoring_positions) and getattr(agent_item, "layer_name", None):
+            key = (agent_item.layer_name, agent_item.name)
+            self._agent_position_cache[key] = agent_item.pos()
 
     def _clear_edge_registry(self):
         self._edges_by_func.clear()
@@ -309,6 +325,12 @@ class CanvasScene(QGraphicsScene):
         record: bool = True,
         emit_signal: bool = False,
     ) -> bool:
+        if conn_type == "MessageNone":
+            return False
+        if getattr(src_item, "out_type", None) == "MessageNone":
+            return False
+        if getattr(dst_item, "in_type", None) == "MessageNone":
+            return False
         if spec is None:
             spec = self._normalize_spec({
                 "src": src_item.id_str,
@@ -393,18 +415,50 @@ class CanvasScene(QGraphicsScene):
             dst_item = self._find_function_item(spec.get("dst"), spec.get("dst_layer"))
             if not src_item or not dst_item:
                 continue
-            self._create_connection_between(
+            if self._create_connection_between(
                 src_item,
                 dst_item,
                 spec.get("type", "MessageNone"),
                 spec=spec,
                 record=False,
                 emit_signal=False,
-            )
-            restored_specs.append(spec)
+            ):
+                restored_specs.append(spec)
 
         self._connection_specs = restored_specs
         self._connections_need_sync = False
+
+    def _apply_manual_positions(self):
+        if not self._agent_position_cache and not self._func_position_cache:
+            return
+        self._restoring_positions = True
+        try:
+            for key, pos in self._agent_position_cache.items():
+                item = self._agent_items.get(key)
+                if item:
+                    item.setPos(pos)
+            for items in self._func_items.values():
+                for item in items:
+                    cache_key = (getattr(item, "layer_name", None), item.id_str)
+                    pos = self._func_position_cache.get(cache_key)
+                    if pos is not None:
+                        item.setPos(pos)
+        finally:
+            self._restoring_positions = False
+        self._prune_position_caches()
+
+    def _prune_position_caches(self):
+        existing_agents = set(self._agent_items.keys())
+        self._agent_position_cache = {
+            key: pos for key, pos in self._agent_position_cache.items() if key in existing_agents
+        }
+        existing_funcs = set()
+        for items in self._func_items.values():
+            for item in items:
+                existing_funcs.add((getattr(item, "layer_name", None), item.id_str))
+        self._func_position_cache = {
+            key: pos for key, pos in self._func_position_cache.items() if key in existing_funcs
+        }
 
     def get_connections(self) -> list[dict]:
         return [dict(spec) for spec in self._connection_specs]
