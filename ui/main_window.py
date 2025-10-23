@@ -11,6 +11,7 @@ from ui.tabs.model_tab import ModelTab
 from ui.canvas.canvas_view import CanvasView
 from core.signals import signals
 from core.storage import save_config, load_config
+from core.ui_helpers import show_quiet_message
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -93,7 +94,7 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Save Failed", f"Could not save configuration:\n{exc}")
             return
 
-        QMessageBox.information(self, "Saved", f"Configuration saved to:\n{filename}")
+        show_quiet_message(self, "Saved", f"Configuration saved to:\n{filename}")
 
     def _load_configuration(self):
         filename, _ = QFileDialog.getOpenFileName(
@@ -146,4 +147,4 @@ class MainWindow(QMainWindow):
 
         signals.redraw_canvas.emit()
 
-        QMessageBox.information(self, "Loaded", f"Configuration loaded from:\n{filename}")
+        show_quiet_message(self, "Loaded", f"Configuration loaded from:\n{filename}")

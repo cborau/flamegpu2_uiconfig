@@ -6,6 +6,7 @@ from PySide6.QtGui import QColor
 from PySide6.QtCore import Qt
 from core.signals import signals
 from core.models import AgentType, AgentVariable, AgentFunction
+from core.ui_helpers import show_quiet_message
 from copy import deepcopy
 
 class ModelTab(QWidget):
@@ -170,7 +171,7 @@ class ModelTab(QWidget):
 
         updated = AgentType(agent.name, agent.color, new_vars, new_funcs)
         signals.agent_updated.emit(updated)
-        QMessageBox.information(self, "Updated", f"Edits applied to '{agent.name}'.")
+        show_quiet_message(self, "Updated", f"Edits applied to '{agent.name}'.")
 
     def export_model(self):
         print("[Export] Functionality not yet implemented")

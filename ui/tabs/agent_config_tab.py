@@ -7,6 +7,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QIcon, QColor
 from core.models import AgentType, AgentVariable, AgentFunction
 from core.signals import signals
+from core.ui_helpers import show_quiet_message
 
 class AgentConfigTab(QWidget):
     def __init__(self):
@@ -274,13 +275,13 @@ class AgentConfigTab(QWidget):
             self.agent_templates[name] = agent
             signals.agent_updated.emit(agent)
             signals.redraw_canvas.emit()
-            QMessageBox.information(self, "Agent Updated", f"Agent '{name}' updated.")
+            show_quiet_message(self, "Agent Updated", f"Agent '{name}' updated.")
             self.reset_fields()
         else:
             self.agent_templates[name] = agent
             signals.agent_added.emit(agent)
             signals.redraw_canvas.emit()
-            QMessageBox.information(self, "Agent Saved", f"Agent '{name}' created.")
+            show_quiet_message(self, "Agent Saved", f"Agent '{name}' created.")
             # Add as selectable template for reuse
             if self.template_combo.findText(name) == -1:
                 self.template_combo.addItem(name)
