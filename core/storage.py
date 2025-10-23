@@ -3,11 +3,12 @@ from dataclasses import asdict
 from core.models import AgentType, AgentFunction, AgentVariable, Layer, GlobalVariable
 
 
-def save_config(filename, agents, layers, globals_):
+def save_config(filename, agents, layers, globals_, connections=None):
     data = {
         "agents": [asdict(agent) for agent in agents],
         "layers": [asdict(layer) for layer in layers],
-        "globals": [asdict(glob) for glob in globals_]
+        "globals": [asdict(glob) for glob in globals_],
+        "connections": connections or [],
     }
     with open(filename, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2)
@@ -33,4 +34,6 @@ def load_config(filename):
     globals_ = []
     for g in data.get("globals", []):
         globals_.append(GlobalVariable(g.get("name", ""), g.get("value", "")))
-    return agents, layers, globals_
+
+    connections = data.get("connections", [])
+    return agents, layers, globals_, connections

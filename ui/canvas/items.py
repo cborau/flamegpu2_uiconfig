@@ -65,6 +65,7 @@ class FunctionNodeItem(QGraphicsRectItem):
         self.func_name = func_name
         self.in_type = in_type
         self.out_type = out_type
+        self.layer_name = None
 
         self.setBrush(QBrush(QColor(255, 255, 255, 28)))
         self.setPen(QPen(QColor(140, 140, 140), 1.2))
@@ -120,10 +121,12 @@ class FunctionNodeItem(QGraphicsRectItem):
 
 class ConnectionItem(QGraphicsPathItem):
     """Bezier-ish curved arrow from src.func out-port to dst.func in-port."""
-    def __init__(self, src_item: FunctionNodeItem, dst_item: FunctionNodeItem):
+
+    def __init__(self, src_item: FunctionNodeItem, dst_item: FunctionNodeItem, message_type: str = "MessageNone"):
         super().__init__()
         self.src = src_item
         self.dst = dst_item
+        self.message_type = message_type
         self.setZValue(-1)
         self.setPen(QPen(QColor("#8ad"), 2.0))
         self.setFlag(QGraphicsItem.ItemIsSelectable, True)
@@ -145,6 +148,12 @@ class ConnectionItem(QGraphicsPathItem):
         super().paint(p, opt, widget)
         # Arrowhead at end
         path = self.path()
+        color = self.pen().color()
+        start = path.pointAtPercent(0.0)
+        p.setPen(Qt.NoPen)
+        p.setBrush(QBrush(color))
+        p.drawEllipse(start, 3.5, 3.5)
+
         if path.length() <= 1.0:
             return
         end = path.pointAtPercent(1.0)
@@ -160,7 +169,7 @@ class ConnectionItem(QGraphicsPathItem):
         b = end - v * s + left * (s*0.6)
         c = end - v * s - left * (s*0.6)
         arrow_poly = QPolygonF([a, b, c])
-        p.setBrush(QBrush(QColor("#8ad")))
+        p.setBrush(QBrush(color))
         p.drawPolygon(arrow_poly)
 
 

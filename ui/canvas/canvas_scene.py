@@ -25,6 +25,9 @@ class CanvasScene(QGraphicsScene):
         self._func_items: Dict[str, List[FunctionNodeItem]] = {}         # "Agent::Func" -> [items]
         self._connections: List[ConnectionItem] = []
         self._agent_connections: List[AgentConnectionItem] = []
+        self._connection_specs: List[dict] = []
+        self._connection_keys = set()
+        self._connections_need_sync = False
 
         # Drag-wire state
         self._drag_src: FunctionNodeItem | None = None
@@ -86,6 +89,7 @@ class CanvasScene(QGraphicsScene):
         self._agent_items.clear()
         self._func_items.clear()
         self._connections.clear()
+        self._connections_need_sync = True
 
         if not self._layers:
             return
@@ -139,6 +143,7 @@ class CanvasScene(QGraphicsScene):
                             continue
                         fn_item = FunctionNodeItem(ag_name, f_name, f_meta.input_type, f_meta.output_type)
                         self.addItem(fn_item)
+                        fn_item.layer_name = L["name"]
                         self._func_items.setdefault(f"{ag_name}::{f_name}", []).append(fn_item)
                         fn_item.on_moved = self._on_func_moved
                         self._edges_by_func.setdefault(fn_item, [])
@@ -180,6 +185,7 @@ class CanvasScene(QGraphicsScene):
 
             y += band_h + 30.0
 
+        self._restore_connections_from_specs(force=True)
         # Enable interactive wiring
         self.installEventFilter(self)
 
@@ -215,18 +221,12 @@ class CanvasScene(QGraphicsScene):
             if drop_item and drop_item is not self._drag_src:
                 # Validate types: src.out == dst.in
                 if self._drag_src.out_type == drop_item.in_type:
-                    conn = ConnectionItem(self._drag_src, drop_item)
-                    self.addItem(conn)
-                    self._connections.append(conn)
-                    # register both ends so we can refresh on move
-                    self._edges_by_func.setdefault(self._drag_src, []).append(conn)
-                    self._edges_by_func.setdefault(drop_item, []).append(conn)
-
-                    signals.connection_added.emit({
-                        "src": self._drag_src.id_str,
-                        "dst": drop_item.id_str,
-                        "type": self._drag_src.out_type
-                    })
+                    self._create_connection_between(
+                        self._drag_src,
+                        drop_item,
+                        self._drag_src.out_type,
+                        emit_signal=True
+                    )
                 else:
                     # (optional) visual feedback on type mismatch
                     pass
@@ -241,14 +241,7 @@ class CanvasScene(QGraphicsScene):
         if event.key() in (Qt.Key_Delete, Qt.Key_Backspace):
             for it in list(self.selectedItems()):
                 if isinstance(it, ConnectionItem):
-                    signals.connection_removed.emit({
-                        "src": it.src.id_str,
-                        "dst": it.dst.id_str,
-                        "type": it.src.out_type
-                    })
-                    self.removeItem(it)
-                    if it in self._connections:
-                        self._connections.remove(it)
+                    self._remove_connection(it, emit_signal=True)
         super().keyPressEvent(event)
 
     # ----- Edge maintenance ---------------------------------------------------
@@ -272,3 +265,165 @@ class CanvasScene(QGraphicsScene):
         while item and not isinstance(item, FunctionNodeItem):
             item = item.parentItem()
         return item if isinstance(item, FunctionNodeItem) else None
+
+    def _find_function_item(self, func_id: str, layer_name: str | None):
+        items = self._func_items.get(func_id, [])
+        if not items:
+            return None
+        if layer_name:
+            for item in items:
+                if getattr(item, "layer_name", None) == layer_name:
+                    return item
+        return items[0]
+
+    def _make_conn_key(self, spec: dict):
+        return (
+            spec.get("src"),
+            spec.get("dst"),
+            spec.get("type", "MessageNone"),
+            spec.get("src_layer"),
+            spec.get("dst_layer"),
+        )
+
+    def _normalize_spec(self, spec: dict, copy: bool = True):
+        if not spec:
+            return None
+        src = spec.get("src")
+        dst = spec.get("dst")
+        if not src or not dst:
+            return None
+        norm = dict(spec) if copy else spec
+        norm["src"] = src
+        norm["dst"] = dst
+        norm["type"] = spec.get("type", "MessageNone")
+        norm["src_layer"] = spec.get("src_layer", spec.get("layer"))
+        norm["dst_layer"] = spec.get("dst_layer", spec.get("layer"))
+        return norm
+
+    def _create_connection_between(
+        self,
+        src_item: FunctionNodeItem,
+        dst_item: FunctionNodeItem,
+        conn_type: str,
+        spec: dict | None = None,
+        record: bool = True,
+        emit_signal: bool = False,
+    ) -> bool:
+        if spec is None:
+            spec = self._normalize_spec({
+                "src": src_item.id_str,
+                "dst": dst_item.id_str,
+                "type": conn_type,
+                "src_layer": getattr(src_item, "layer_name", None),
+                "dst_layer": getattr(dst_item, "layer_name", None),
+            })
+        else:
+            spec = self._normalize_spec(spec, copy=record)
+        if not spec:
+            return False
+        key = self._make_conn_key(spec)
+        if record and key in self._connection_keys:
+            return False
+
+        conn = ConnectionItem(src_item, dst_item, spec.get("type", "MessageNone"))
+        conn.spec = spec
+        conn.key = key
+        self.addItem(conn)
+        self._connections.append(conn)
+        self._edges_by_func.setdefault(src_item, []).append(conn)
+        self._edges_by_func.setdefault(dst_item, []).append(conn)
+        self._connection_keys.add(key)
+        if record:
+            self._connection_specs.append(spec)
+        if emit_signal:
+            signals.connection_added.emit(spec)
+        self._connections_need_sync = False
+        return True
+
+    def _detach_connection_item(self, conn: ConnectionItem):
+        if conn in self._connections:
+            self._connections.remove(conn)
+        edges = self._edges_by_func.get(conn.src)
+        if edges and conn in edges:
+            edges.remove(conn)
+            if not edges:
+                del self._edges_by_func[conn.src]
+        edges = self._edges_by_func.get(conn.dst)
+        if edges and conn in edges:
+            edges.remove(conn)
+            if not edges:
+                del self._edges_by_func[conn.dst]
+        if conn.scene() is self:
+            self.removeItem(conn)
+
+    def _remove_connection(self, conn: ConnectionItem, emit_signal: bool = False):
+        spec = getattr(conn, "spec", None)
+        key = getattr(conn, "key", None)
+        self._detach_connection_item(conn)
+        if key is not None:
+            self._connection_keys.discard(key)
+        if spec and spec in self._connection_specs:
+            self._connection_specs.remove(spec)
+        if emit_signal and spec:
+            signals.connection_removed.emit(spec)
+        self._connections_need_sync = False
+
+    def _remove_all_manual_connections(self):
+        for conn in list(self._connections):
+            self._detach_connection_item(conn)
+        self._connections.clear()
+
+    def _restore_connections_from_specs(self, force: bool = False):
+        if not self._connection_specs:
+            self._connection_keys = set()
+            self._connections_need_sync = False
+            return
+        if not force and not self._connections_need_sync:
+            return
+        if not self._func_items:
+            self._connections_need_sync = True
+            return
+
+        specs_snapshot = list(self._connection_specs)
+        self._remove_all_manual_connections()
+        self._connection_keys = set()
+        restored_specs = []
+        for spec in specs_snapshot:
+            src_item = self._find_function_item(spec.get("src"), spec.get("src_layer"))
+            dst_item = self._find_function_item(spec.get("dst"), spec.get("dst_layer"))
+            if not src_item or not dst_item:
+                continue
+            self._create_connection_between(
+                src_item,
+                dst_item,
+                spec.get("type", "MessageNone"),
+                spec=spec,
+                record=False,
+                emit_signal=False,
+            )
+            restored_specs.append(spec)
+
+        self._connection_specs = restored_specs
+        self._connections_need_sync = False
+
+    def get_connections(self) -> list[dict]:
+        return [dict(spec) for spec in self._connection_specs]
+
+    def set_connections(self, specs: list[dict]):
+        normalized: List[dict] = []
+        keys = set()
+        for spec in specs or []:
+            norm = self._normalize_spec(spec)
+            if not norm:
+                continue
+            key = self._make_conn_key(norm)
+            if key in keys:
+                continue
+            normalized.append(norm)
+            keys.add(key)
+
+        self._connection_specs = normalized
+        self._connection_keys = set()
+        self._connections_need_sync = True
+        self._remove_all_manual_connections()
+        self._restore_connections_from_specs(force=True)

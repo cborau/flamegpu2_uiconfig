@@ -3,6 +3,7 @@ from PySide6.QtWidgets import (
     QFileDialog, QMessageBox
 )
 from PySide6.QtCore import Qt
+from pathlib import Path
 from ui.tabs.agent_config_tab import AgentConfigTab
 from ui.tabs.globals_tab import GlobalsTab
 from ui.tabs.layers_tab import LayersTab
@@ -48,6 +49,9 @@ class MainWindow(QMainWindow):
 
         self.setCentralWidget(splitter)
 
+        self._config_dir = (Path(__file__).resolve().parent.parent / "configs").resolve()
+        self._config_dir.mkdir(parents=True, exist_ok=True)
+
         self._init_menus()
 
         # When the Model tab requests to edit, open Agent Config prefilled
@@ -70,7 +74,7 @@ class MainWindow(QMainWindow):
         filename, _ = QFileDialog.getSaveFileName(
             self,
             "Save Configuration",
-            "",
+            str(self._config_dir),
             "JSON Files (*.json)"
         )
         if not filename:
@@ -82,7 +86,8 @@ class MainWindow(QMainWindow):
             agents = self.model_tab.get_agents()
             layers = self.layers_tab.get_layers()
             globals_ = self.globals_tab.get_globals()
-            save_config(filename, agents, layers, globals_)
+            connections = self.canvas.get_connections()
+            save_config(filename, agents, layers, globals_, connections)
         except Exception as exc:
             QMessageBox.critical(self, "Save Failed", f"Could not save configuration:\n{exc}")
             return
@@ -93,14 +98,14 @@ class MainWindow(QMainWindow):
         filename, _ = QFileDialog.getOpenFileName(
             self,
             "Load Configuration",
-            "",
+            str(self._config_dir),
             "JSON Files (*.json)"
         )
         if not filename:
             return
 
         try:
-            agents, layers, globals_ = load_config(filename)
+            agents, layers, globals_, connections = load_config(filename)
         except Exception as exc:
             QMessageBox.critical(self, "Load Failed", f"Could not load configuration:\n{exc}")
             return
@@ -110,7 +115,8 @@ class MainWindow(QMainWindow):
         for agent in existing_agents:
             signals.agent_removed.emit(agent.name)
 
-        self.agent_config_tab.set_agents([])
+        self.canvas.set_connections([])
+
         self.layers_tab.clear_layers()
         self.globals_tab.clear_globals()
 
@@ -118,10 +124,7 @@ class MainWindow(QMainWindow):
         for agent in agents:
             signals.agent_added.emit(agent)
 
-        if agents:
-            self.agent_config_tab.set_agents(agents)
-        else:
-            self.agent_config_tab.set_agents([])
+        self.agent_config_tab.set_agents(agents)
 
         # Load globals and layers
         self.globals_tab.load_globals(globals_)
@@ -129,6 +132,8 @@ class MainWindow(QMainWindow):
             signals.globals_updated.emit()
 
         self.layers_tab.load_layers(layers)
+
+        self.canvas.set_connections(connections)
 
         # Select first agent/layer if available
         if self.model_tab.agent_list.count() > 0:

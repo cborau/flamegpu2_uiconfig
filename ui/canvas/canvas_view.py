@@ -25,3 +25,9 @@ class CanvasView(QGraphicsView):
         r = self.sceneRect()
         if r.isValid():
             self.fitInView(r, Qt.KeepAspectRatio)
+
+    def get_connections(self):
+        return self._scene.get_connections()
+
+    def set_connections(self, connections):
+        self._scene.set_connections(connections)
