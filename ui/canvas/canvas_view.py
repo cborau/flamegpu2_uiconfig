@@ -31,3 +31,9 @@ class CanvasView(QGraphicsView):
 
     def set_connections(self, connections):
         self._scene.set_connections(connections)
+
+    def get_manual_layout(self):
+        return self._scene.get_manual_layout()
+
+    def set_manual_layout(self, layout):
+        self._scene.set_manual_layout(layout)

@@ -87,7 +87,8 @@ class MainWindow(QMainWindow):
             layers = self.layers_tab.get_layers()
             globals_ = self.globals_tab.get_globals()
             connections = self.canvas.get_connections()
-            save_config(filename, agents, layers, globals_, connections)
+            manual_layout = self.canvas.get_manual_layout()
+            save_config(filename, agents, layers, globals_, connections, manual_layout)
         except Exception as exc:
             QMessageBox.critical(self, "Save Failed", f"Could not save configuration:\n{exc}")
             return
@@ -105,7 +106,7 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            agents, layers, globals_, connections = load_config(filename)
+            agents, layers, globals_, connections, manual_layout = load_config(filename)
         except Exception as exc:
             QMessageBox.critical(self, "Load Failed", f"Could not load configuration:\n{exc}")
             return
@@ -132,6 +133,8 @@ class MainWindow(QMainWindow):
             signals.globals_updated.emit()
 
         self.layers_tab.load_layers(layers)
+
+        self.canvas.set_manual_layout(manual_layout)
 
         self.canvas.set_connections(connections)
 

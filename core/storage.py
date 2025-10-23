@@ -3,13 +3,15 @@ from dataclasses import asdict
 from core.models import AgentType, AgentFunction, AgentVariable, Layer, GlobalVariable
 
 
-def save_config(filename, agents, layers, globals_, connections=None):
+def save_config(filename, agents, layers, globals_, connections=None, layout=None):
     data = {
         "agents": [asdict(agent) for agent in agents],
         "layers": [asdict(layer) for layer in layers],
         "globals": [asdict(glob) for glob in globals_],
         "connections": connections or [],
     }
+    if layout:
+        data["manual_layout"] = layout
     with open(filename, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2)
 
@@ -36,4 +38,5 @@ def load_config(filename):
         globals_.append(GlobalVariable(g.get("name", ""), g.get("value", "")))
 
     connections = data.get("connections", [])
-    return agents, layers, globals_, connections
+    layout = data.get("manual_layout", {})
+    return agents, layers, globals_, connections, layout

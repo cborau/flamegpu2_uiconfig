@@ -494,6 +494,63 @@ class CanvasScene(QGraphicsScene):
         self._connection_specs = restored_specs
         self._connections_need_sync = False
 
+    def get_manual_layout(self) -> dict:
+        self._prune_position_caches()
+        layout = {"agents": {}, "functions": {}}
+
+        for (layer_name, agent_name), item in self._agent_items.items():
+            pos = item.pos()
+            layout["agents"].setdefault(layer_name, {})[agent_name] = [pos.x(), pos.y()]
+            self._agent_position_cache[(layer_name, agent_name)] = QPointF(pos.x(), pos.y())
+
+        for items in self._func_items.values():
+            for item in items:
+                layer_name = getattr(item, "layer_name", None)
+                if not layer_name:
+                    continue
+                pos = item.pos()
+                layout["functions"].setdefault(layer_name, {})[item.id_str] = [pos.x(), pos.y()]
+                self._func_position_cache[(layer_name, item.id_str)] = QPointF(pos.x(), pos.y())
+
+        return layout
+
+    def set_manual_layout(self, layout: dict | None):
+        self._agent_position_cache.clear()
+        self._func_position_cache.clear()
+
+        if not layout:
+            return
+
+        agents = layout.get("agents", {}) if isinstance(layout, dict) else {}
+        for layer_name, agents_map in agents.items():
+            if not isinstance(agents_map, dict):
+                continue
+            for agent_name, coords in agents_map.items():
+                if not isinstance(coords, (list, tuple)) or len(coords) < 2:
+                    continue
+                try:
+                    x = float(coords[0])
+                    y = float(coords[1])
+                except (TypeError, ValueError):
+                    continue
+                self._agent_position_cache[(layer_name, agent_name)] = QPointF(x, y)
+
+        funcs = layout.get("functions", {}) if isinstance(layout, dict) else {}
+        for layer_name, funcs_map in funcs.items():
+            if not isinstance(funcs_map, dict):
+                continue
+            for func_id, coords in funcs_map.items():
+                if not isinstance(coords, (list, tuple)) or len(coords) < 2:
+                    continue
+                try:
+                    x = float(coords[0])
+                    y = float(coords[1])
+                except (TypeError, ValueError):
+                    continue
+                self._func_position_cache[(layer_name, func_id)] = QPointF(x, y)
+
+        self._apply_manual_positions()
+
     def _apply_manual_positions(self):
         if not self._agent_position_cache and not self._func_position_cache:
             return
