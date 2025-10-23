@@ -105,12 +105,6 @@ class FunctionNodeItem(QGraphicsRectItem):
         # re-center label
         self.label.setPos(-br.width() / 2, -br.height() / 2)
 
-    def port_pos_in(self) -> QPointF:
-        return self.port_pos_left()
-
-    def port_pos_out(self) -> QPointF:
-        return self.port_pos_right()
-
     def port_pos_left(self) -> QPointF:
         r = self.rect()
         return self.mapToScene(QPointF(r.left(), 0.0))
@@ -118,6 +112,14 @@ class FunctionNodeItem(QGraphicsRectItem):
     def port_pos_right(self) -> QPointF:
         r = self.rect()
         return self.mapToScene(QPointF(r.right(), 0.0))
+
+    def port_pos_in(self) -> QPointF:
+        r = self.rect()
+        return self.mapToScene(QPointF(0.0, r.top()))
+
+    def port_pos_out(self) -> QPointF:
+        r = self.rect()
+        return self.mapToScene(QPointF(0.0, r.bottom()))
 
     def port_pos_agent(self) -> QPointF:
         return self.port_pos_left()
@@ -151,20 +153,16 @@ class ConnectionItem(QGraphicsPathItem):
         if self.src is self.dst:
             p0 = self.src.port_pos_right()
             p1 = self.dst.port_pos_right()
-            direction = 1.0
-        elif src_center.x() <= dst_center.x():
-            p0 = self.src.port_pos_right()
-            p1 = self.dst.port_pos_left()
-            direction = 1.0
+            dx = max(60.0, abs(p1.x() - p0.x()) * 0.5)
+            c0 = QPointF(p0.x() + dx, p0.y())
+            c1 = QPointF(p1.x() + dx, p1.y())
         else:
-            p0 = self.src.port_pos_left()
-            p1 = self.dst.port_pos_right()
-            direction = -1.0
-
-        dx = max(60.0, abs(p1.x() - p0.x()) * 0.3)
-        dy = (p1.y() - p0.y()) * 0.5
-        c0 = QPointF(p0.x() + direction * dx, p0.y() + dy)
-        c1 = QPointF(p1.x() - direction * dx, p1.y() - dy)
+            p0 = self.src.port_pos_out()
+            p1 = self.dst.port_pos_in()
+            dy = max(40.0, abs(p1.y() - p0.y()) * 0.5)
+            mid_dx = (p1.x() - p0.x()) * 0.25
+            c0 = QPointF(p0.x() + mid_dx, p0.y() + dy)
+            c1 = QPointF(p1.x() - mid_dx, p1.y() - dy)
 
         path = QPainterPath(p0)
         path.cubicTo(c0, c1, p1)
