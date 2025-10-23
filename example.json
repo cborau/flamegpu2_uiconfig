@@ -1,0 +1,130 @@
+{
+  "agents": [
+    {
+      "name": "cell",
+      "color": "#e6194b",
+      "variables": [
+        {
+          "name": "x",
+          "default": "0.0"
+        },
+        {
+          "name": "y",
+          "default": "0.0"
+        },
+        {
+          "name": "z",
+          "default": "0.0"
+        },
+        {
+          "name": "vx",
+          "default": "0.0"
+        },
+        {
+          "name": "vy",
+          "default": "0.0"
+        },
+        {
+          "name": "vz",
+          "default": "0.0"
+        }
+      ],
+      "functions": [
+        {
+          "name": "function1",
+          "description": "fgasdgag",
+          "input_type": "MessageSpatial3D",
+          "output_type": "MessageSpatial3D"
+        },
+        {
+          "name": "function2",
+          "description": "ghasdh",
+          "input_type": "MessageSpatial3D",
+          "output_type": "MessageSpatial3D"
+        }
+      ]
+    },
+    {
+      "name": "ecm",
+      "color": "#00ff7f",
+      "variables": [
+        {
+          "name": "x",
+          "default": "0.0"
+        },
+        {
+          "name": "y",
+          "default": "0.0"
+        },
+        {
+          "name": "z",
+          "default": "0.0"
+        },
+        {
+          "name": "vx",
+          "default": "0.0"
+        },
+        {
+          "name": "vy",
+          "default": "0.0"
+        },
+        {
+          "name": "vz",
+          "default": "0.0"
+        }
+      ],
+      "functions": [
+        {
+          "name": "function3",
+          "description": "fgasdgag",
+          "input_type": "MessageSpatial3D",
+          "output_type": "MessageSpatial3D"
+        },
+        {
+          "name": "function4",
+          "description": "ghasdh",
+          "input_type": "MessageSpatial3D",
+          "output_type": "MessageSpatial3D"
+        },
+        {
+          "name": "function5",
+          "description": "ghsh",
+          "input_type": "MessageSpatial3D",
+          "output_type": "MessageSpatial3D"
+        }
+      ]
+    }
+  ],
+  "layers": [
+    {
+      "name": "L1",
+      "function_ids": [
+        "cell::function1",
+        "cell::function2",
+        "ecm::function4"
+      ]
+    },
+    {
+      "name": "L2",
+      "function_ids": [
+        "cell::function2",
+        "ecm::function3",
+        "ecm::function5"
+      ]
+    },
+    {
+      "name": "L3",
+      "function_ids": [
+        "cell::function2",
+        "ecm::function4",
+        "ecm::function5"
+      ]
+    }
+  ],
+  "globals": [
+    {
+      "name": "k",
+      "value": "33"
+    }
+  ]
+}

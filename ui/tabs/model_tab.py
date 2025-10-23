@@ -6,6 +6,7 @@ from PySide6.QtGui import QColor
 from PySide6.QtCore import Qt
 from core.signals import signals
 from core.models import AgentType, AgentVariable, AgentFunction
+from copy import deepcopy
 
 class ModelTab(QWidget):
     def __init__(self):
@@ -81,6 +82,8 @@ class ModelTab(QWidget):
         self.refresh_list()
         self.vars_table.setRowCount(0)
         self.funcs_table.setRowCount(0)
+        if self.agents:
+            self.agent_list.setCurrentRow(0)
 
     def refresh_list(self):
         self.agent_list.clear()
@@ -171,3 +174,25 @@ class ModelTab(QWidget):
 
     def export_model(self):
         print("[Export] Functionality not yet implemented")
+
+    # ------- Persistence helpers -------
+    def get_agents(self):
+        return deepcopy(self.agents)
+
+    def clear_agents(self):
+        self.agents = []
+        self.agent_list.clear()
+        self.vars_table.setRowCount(0)
+        self.funcs_table.setRowCount(0)
+
+    def load_agents(self, agents):
+        self.agents = deepcopy(agents)
+        self.refresh_list()
+        if self.agents:
+            self.agent_list.setCurrentRow(0)
+        else:
+            self.agent_list.setCurrentRow(-1)
+
+    def replace_agents(self, agents):
+        self.clear_agents()
+        self.load_agents(agents)

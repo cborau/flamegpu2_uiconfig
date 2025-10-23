@@ -1,4 +1,7 @@
-from PySide6.QtWidgets import QMainWindow, QWidget, QSplitter, QTabWidget, QVBoxLayout
+from PySide6.QtWidgets import (
+    QMainWindow, QWidget, QSplitter, QTabWidget, QVBoxLayout,
+    QFileDialog, QMessageBox
+)
 from PySide6.QtCore import Qt
 from ui.tabs.agent_config_tab import AgentConfigTab
 from ui.tabs.globals_tab import GlobalsTab
@@ -6,6 +9,7 @@ from ui.tabs.layers_tab import LayersTab
 from ui.tabs.model_tab import ModelTab
 from ui.canvas.canvas_view import CanvasView
 from core.signals import signals
+from core.storage import save_config, load_config
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -44,9 +48,94 @@ class MainWindow(QMainWindow):
 
         self.setCentralWidget(splitter)
 
+        self._init_menus()
+
         # When the Model tab requests to edit, open Agent Config prefilled
         signals.request_edit_agent.connect(self._open_edit_agent)
 
     def _open_edit_agent(self, agent):
         self.tab_widget.setCurrentWidget(self.agent_config_tab)
         self.agent_config_tab.load_agent_for_edit(agent)
+
+    def _init_menus(self):
+        file_menu = self.menuBar().addMenu("&File")
+
+        load_action = file_menu.addAction("Load Configuration…")
+        load_action.triggered.connect(self._load_configuration)
+
+        save_action = file_menu.addAction("Save Configuration…")
+        save_action.triggered.connect(self._save_configuration)
+
+    def _save_configuration(self):
+        filename, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Configuration",
+            "",
+            "JSON Files (*.json)"
+        )
+        if not filename:
+            return
+        if not filename.lower().endswith(".json"):
+            filename += ".json"
+
+        try:
+            agents = self.model_tab.get_agents()
+            layers = self.layers_tab.get_layers()
+            globals_ = self.globals_tab.get_globals()
+            save_config(filename, agents, layers, globals_)
+        except Exception as exc:
+            QMessageBox.critical(self, "Save Failed", f"Could not save configuration:\n{exc}")
+            return
+
+        QMessageBox.information(self, "Saved", f"Configuration saved to:\n{filename}")
+
+    def _load_configuration(self):
+        filename, _ = QFileDialog.getOpenFileName(
+            self,
+            "Load Configuration",
+            "",
+            "JSON Files (*.json)"
+        )
+        if not filename:
+            return
+
+        try:
+            agents, layers, globals_ = load_config(filename)
+        except Exception as exc:
+            QMessageBox.critical(self, "Load Failed", f"Could not load configuration:\n{exc}")
+            return
+
+        # Remove existing agents and reset state
+        existing_agents = self.model_tab.get_agents()
+        for agent in existing_agents:
+            signals.agent_removed.emit(agent.name)
+
+        self.agent_config_tab.set_agents([])
+        self.layers_tab.clear_layers()
+        self.globals_tab.clear_globals()
+
+        # Load new agents
+        for agent in agents:
+            signals.agent_added.emit(agent)
+
+        if agents:
+            self.agent_config_tab.set_agents(agents)
+        else:
+            self.agent_config_tab.set_agents([])
+
+        # Load globals and layers
+        self.globals_tab.load_globals(globals_)
+        if globals_:
+            signals.globals_updated.emit()
+
+        self.layers_tab.load_layers(layers)
+
+        # Select first agent/layer if available
+        if self.model_tab.agent_list.count() > 0:
+            self.model_tab.agent_list.setCurrentRow(0)
+        if self.layers_tab.layer_table.rowCount() > 0:
+            self.layers_tab.layer_table.selectRow(0)
+
+        signals.redraw_canvas.emit()
+
+        QMessageBox.information(self, "Loaded", f"Configuration loaded from:\n{filename}")

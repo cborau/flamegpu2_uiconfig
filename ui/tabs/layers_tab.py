@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton, QListWidget, QListWidgetItem, QTableWidget, QTableWidgetItem, QAbstractItemView, QHBoxLayout, QCheckBox
 from PySide6.QtCore import Qt
 from core.signals import signals
+from core.models import Layer
 
 class LayersTab(QWidget):
     def __init__(self):
@@ -21,8 +22,13 @@ class LayersTab(QWidget):
 
         self.layer_table = QTableWidget(0, 1)
         self.layer_table.setHorizontalHeaderLabels(["Layer Name"])
-        self.layer_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.layer_table.setEditTriggers(
+            QAbstractItemView.DoubleClicked
+            | QAbstractItemView.SelectedClicked
+            | QAbstractItemView.EditKeyPressed
+        )
         self.layer_table.cellClicked.connect(self.select_layer)
+        self.layer_table.itemChanged.connect(self._on_layer_name_changed)
         layout.addWidget(self.layer_table)
 
         layout.addWidget(QLabel("Functions for Selected Layer:"))
@@ -41,6 +47,7 @@ class LayersTab(QWidget):
         self.layer_store = []  # list of dicts {name, functions}
         self.functions = []    # list of all available "Agent::Function"
         self.current_layer_index = -1
+        self._updating_layer_table = False
 
         # Keep functions list in sync with agents
         signals.agent_added.connect(self.receive_agent)
@@ -77,11 +84,19 @@ class LayersTab(QWidget):
         self._broadcast_layers()
 
     def refresh_layer_table(self):
+        self._updating_layer_table = True
+        self.layer_table.blockSignals(True)
         self.layer_table.setRowCount(0)
         for layer in self.layer_store:
             row = self.layer_table.rowCount()
             self.layer_table.insertRow(row)
-            self.layer_table.setItem(row, 0, QTableWidgetItem(layer["name"]))
+            item = QTableWidgetItem(layer["name"])
+            item.setFlags(item.flags() | Qt.ItemIsEditable)
+            self.layer_table.setItem(row, 0, item)
+        self.layer_table.blockSignals(False)
+        self._updating_layer_table = False
+        if 0 <= self.current_layer_index < self.layer_table.rowCount():
+            self.layer_table.selectRow(self.current_layer_index)
 
     def select_layer(self, row, col):
         if row >= len(self.layer_store):
@@ -93,6 +108,49 @@ class LayersTab(QWidget):
         selected_layer = self.layer_store[row]
         self.refresh_function_list(selected_layer["functions"])
         self._broadcast_layers()
+
+    def load_layers(self, layers):
+        self.layer_store = [
+            {"name": layer.name, "functions": list(getattr(layer, "function_ids", getattr(layer, "functions", [])))}
+            for layer in layers
+        ]
+        self.current_layer_index = 0 if self.layer_store else -1
+        self.refresh_layer_table()
+        if self.layer_store:
+            self.refresh_function_list(self.layer_store[self.current_layer_index]["functions"])
+        else:
+            self.refresh_function_list([])
+        self._broadcast_layers()
+
+    def clear_layers(self):
+        self.layer_store = []
+        self.current_layer_index = -1
+        self.refresh_layer_table()
+        self.refresh_function_list([])
+        self._broadcast_layers()
+
+    def _on_layer_name_changed(self, item: QTableWidgetItem):
+        if self._updating_layer_table:
+            return
+        row = item.row()
+        if row < 0 or row >= len(self.layer_store):
+            return
+        new_name = item.text().strip()
+        if not new_name:
+            self._restore_layer_name(row, item)
+            return
+        if any(i != row and layer["name"].lower() == new_name.lower() for i, layer in enumerate(self.layer_store)):
+            self._restore_layer_name(row, item)
+            return
+        self.layer_store[row]["name"] = new_name
+        self._broadcast_layers()
+
+    def _restore_layer_name(self, row: int, item: QTableWidgetItem):
+        self._updating_layer_table = True
+        self.layer_table.blockSignals(True)
+        item.setText(self.layer_store[row]["name"])
+        self.layer_table.blockSignals(False)
+        self._updating_layer_table = False
 
     # --- UI helpers ---
     def refresh_function_list(self, selected_funcs):
@@ -119,3 +177,8 @@ class LayersTab(QWidget):
         if 0 <= self.current_layer_index < len(self.layer_store):
             self.layer_store[self.current_layer_index]["functions"] = [item.text() for item in self._iter_checked_items()]
         signals.layers_changed.emit([{"name": L["name"], "functions": list(L["functions"])} for L in self.layer_store])
+
+    def get_layers(self):
+        if 0 <= self.current_layer_index < len(self.layer_store):
+            self.layer_store[self.current_layer_index]["functions"] = [item.text() for item in self._iter_checked_items()]
+        return [Layer(layer["name"], list(layer["functions"])) for layer in self.layer_store]

@@ -74,6 +74,11 @@ class AgentConfigTab(QWidget):
         self.selected_color = None
         self.populate_default_variables()
 
+        # sync templates with global agent signals
+        signals.agent_added.connect(self._register_agent_template)
+        signals.agent_updated.connect(self._register_agent_template)
+        signals.agent_removed.connect(self._remove_agent_template)
+
     # ---------- Helpers ----------
     def reset_fields(self):
         self.name_edit.clear()
@@ -142,6 +147,35 @@ class AgentConfigTab(QWidget):
                 if table.cellWidget(r, c) is button:
                     table.removeRow(r)
                     return
+
+    def _register_agent_template(self, agent: AgentType):
+        self.agent_templates[agent.name] = agent
+        if self.template_combo.findText(agent.name) == -1:
+            self.template_combo.addItem(agent.name)
+
+    def _remove_agent_template(self, agent_name: str):
+        if agent_name in self.agent_templates:
+            del self.agent_templates[agent_name]
+        idx = self.template_combo.findText(agent_name)
+        if idx != -1:
+            self.template_combo.removeItem(idx)
+        if self.template_combo.count() == 0:
+            self.template_combo.addItem("-- Select Template --")
+        self.template_combo.setCurrentIndex(0)
+
+    def set_agents(self, agents: list[AgentType]):
+        self.agent_templates = {agent.name: agent for agent in agents}
+        self.template_combo.blockSignals(True)
+        current = self.template_combo.currentText()
+        self.template_combo.clear()
+        self.template_combo.addItem("-- Select Template --")
+        for name in sorted(self.agent_templates.keys()):
+            self.template_combo.addItem(name)
+        if current and self.template_combo.findText(current) != -1:
+            self.template_combo.setCurrentText(current)
+        else:
+            self.template_combo.setCurrentIndex(0)
+        self.template_combo.blockSignals(False)
 
     # ---------- Template loading ----------
     def load_template(self, template_name):
