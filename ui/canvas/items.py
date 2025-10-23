@@ -1,3 +1,4 @@
+from typing import Optional
 from PySide6.QtCore import QRectF, QPointF, Qt
 from PySide6.QtGui import QBrush, QColor, QPainter, QPainterPath, QPen, QPolygonF
 from PySide6.QtWidgets import QGraphicsItem, QGraphicsPathItem, QGraphicsRectItem, QGraphicsSimpleTextItem
@@ -10,6 +11,9 @@ H_SPACING = 80.0
 F_SPACING = 28.0
 
 class LayerBandItem(QGraphicsRectItem):
+    RESIZE_MARGIN = 10.0
+    MIN_HEIGHT = 140.0
+
     def __init__(self, name: str, rect: QRectF):
         super().__init__(rect)
         self.setZValue(-10)
@@ -17,7 +21,91 @@ class LayerBandItem(QGraphicsRectItem):
         self.setPen(QPen(QColor(200, 200, 200, 80), 1, Qt.DashLine))
         self.label = QGraphicsSimpleTextItem(name, self)
         self.label.setBrush(QBrush(Qt.white))
+        self.layer_name = name
+        self._interactive = False
+        self._resizing = False
+        self._resize_anchor = 0.0
+        self._initial_height = rect.height()
+        self.on_height_changed = None
+        self.setAcceptHoverEvents(True)
+        self._update_label_position()
+
+    def set_height_change_callback(self, callback):
+        self.on_height_changed = callback
+
+    def set_interactive(self, enabled: bool):
+        self._interactive = enabled
+        if not enabled:
+            self._resizing = False
+            self.unsetCursor()
+
+    def set_top_and_height(self, top: float, height: float):
+        height = max(self.MIN_HEIGHT, height)
+        self._apply_geometry(top=top, height=height, emit=False)
+
+    def _update_label_position(self):
+        rect = self.rect()
         self.label.setPos(rect.left() + 8.0, rect.top() + 4.0)
+
+    def _apply_geometry(self, top: Optional[float] = None, height: Optional[float] = None, emit: bool = True):
+        rect = self.rect()
+        left = rect.left()
+        width = rect.width()
+        if top is None:
+            top = rect.top()
+        if height is None:
+            height = rect.height()
+        height = max(self.MIN_HEIGHT, height)
+        new_rect = QRectF(left, top, width, height)
+        self.prepareGeometryChange()
+        self.setRect(new_rect)
+        self._update_label_position()
+        if emit and self.on_height_changed:
+            self.on_height_changed(new_rect.height())
+
+    def _is_over_resize_area(self, pos: QPointF) -> bool:
+        rect = self.rect()
+        return rect.bottom() - self.RESIZE_MARGIN <= pos.y() <= rect.bottom() + self.RESIZE_MARGIN
+
+    def hoverMoveEvent(self, event):
+        if self._interactive and self._is_over_resize_area(event.pos()):
+            self.setCursor(Qt.SizeVerCursor)
+        else:
+            self.unsetCursor()
+        super().hoverMoveEvent(event)
+
+    def hoverLeaveEvent(self, event):
+        self.unsetCursor()
+        super().hoverLeaveEvent(event)
+
+    def mousePressEvent(self, event):
+        if (
+            self._interactive
+            and event.button() == Qt.LeftButton
+            and self._is_over_resize_area(event.pos())
+        ):
+            self._resizing = True
+            self._resize_anchor = event.pos().y()
+            self._initial_height = self.rect().height()
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._resizing:
+            delta = event.pos().y() - self._resize_anchor
+            new_height = self._initial_height + delta
+            self._apply_geometry(height=new_height)
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if self._resizing and event.button() == Qt.LeftButton:
+            self._resizing = False
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
 
 class AgentNodeItem(QGraphicsItem):
     def __init__(self, name: str, color: QColor):

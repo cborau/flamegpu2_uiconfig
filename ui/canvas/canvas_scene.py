@@ -18,6 +18,7 @@ class CanvasScene(QGraphicsScene):
         # Data caches
         self._agents_by_name: Dict[str, AgentType] = {}
         self._layers: List[Dict] = []  # [{"name": str, "functions": [ "Agent::Func", ... ]}, ...]
+        self._layer_heights: Dict[str, float] = {}
 
         # Graphics indexes
         self._bands: List[LayerBandItem] = []
@@ -64,6 +65,8 @@ class CanvasScene(QGraphicsScene):
         for items in self._func_items.values():
             for fn_item in items:
                 fn_item.set_movable(enabled)
+        for band in self._bands:
+            band.set_interactive(enabled)
         # positions stay as-is when toggling manual mode off
 
     def _add_or_update_agent(self, a: AgentType):
@@ -86,6 +89,10 @@ class CanvasScene(QGraphicsScene):
 
     def _set_layers(self, layers_list: List[Dict]):
         self._layers = layers_list or []
+        layer_names = {L.get("name") for L in self._layers if L.get("name")}
+        self._layer_heights = {
+            name: height for name, height in self._layer_heights.items() if name in layer_names
+        }
         self.rebuild()
 
     # ----- Rebuild layout -----------------------------------------------------
@@ -103,14 +110,23 @@ class CanvasScene(QGraphicsScene):
 
         # Simple vertical stacking of layer bands
         y = 40.0
-        band_h = 220.0
+        band_spacing = 30.0
         left, right = 40.0, 3600.0
 
         for L in self._layers:
+            band_name = L["name"]
+            default_height = 220.0
+            band_h = max(
+                getattr(LayerBandItem, "MIN_HEIGHT", 140.0),
+                self._layer_heights.get(band_name, default_height)
+            )
             rect = QRectF(left, y, right - left, band_h)
             band = LayerBandItem(L["name"], rect)
+            band.set_height_change_callback(lambda h, layer_name=band_name: self._on_band_height_changed(layer_name, h))
+            band.set_interactive(self.manual_mode)
             self.addItem(band)
             self._bands.append(band)
+            self._layer_heights[band_name] = band_h
 
             # Which agents are present in this layer?
             funcs = [f for f in L.get("functions", []) if "::" in f]
@@ -191,7 +207,7 @@ class CanvasScene(QGraphicsScene):
                     else:
                         x += max(H_SPACING, 2 * AGENT_R + 160.0)
 
-            y += band_h + 30.0
+            y += band_h + band_spacing
 
         self._restore_connections_from_specs(force=True)
         self._apply_manual_positions()
@@ -273,6 +289,48 @@ class CanvasScene(QGraphicsScene):
         self._edges_by_func.clear()
         self._edges_by_agent.clear()
         self._agent_connections.clear()
+
+    def _on_band_height_changed(self, layer_name: str, new_height: float):
+        if not layer_name:
+            return
+        min_height = getattr(LayerBandItem, "MIN_HEIGHT", 140.0)
+        clamped = max(min_height, new_height)
+        self._layer_heights[layer_name] = clamped
+        self._update_layer_band_layout()
+
+    def _update_layer_band_layout(self):
+        if not self._bands or not self._layers:
+            return
+        y = 40.0
+        spacing = 30.0
+        for layer_dict, band in zip(self._layers, self._bands):
+            layer_name = layer_dict.get("name")
+            if not layer_name:
+                continue
+            min_height = getattr(band, "MIN_HEIGHT", 140.0)
+            target_height = max(min_height, self._layer_heights.get(layer_name, band.rect().height()))
+            current_rect = band.rect()
+            old_top = current_rect.top()
+            delta_top = y - old_top
+            if abs(delta_top) > 0.01 or abs(target_height - current_rect.height()) > 0.01:
+                band.set_top_and_height(y, target_height)
+                if abs(delta_top) > 0.01:
+                    self._shift_layer_items(layer_name, delta_top)
+            else:
+                band.set_top_and_height(y, target_height)
+            self._layer_heights[layer_name] = target_height
+            y += target_height + spacing
+
+    def _shift_layer_items(self, layer_name: str, delta_y: float):
+        if abs(delta_y) < 0.01:
+            return
+        for (layer, _), ag_item in list(self._agent_items.items()):
+            if layer == layer_name:
+                ag_item.moveBy(0.0, delta_y)
+        for func_items in self._func_items.values():
+            for fn_item in func_items:
+                if getattr(fn_item, "layer_name", None) == layer_name:
+                    fn_item.moveBy(0.0, delta_y)
 
     def _function_node_at(self, pos: QPointF) -> FunctionNodeItem | None:
         if not self.views():
