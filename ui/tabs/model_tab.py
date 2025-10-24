@@ -180,7 +180,7 @@ class ModelTab(QWidget):
         show_quiet_message(self, "Updated", f"Edits applied to '{agent.name}'.")
 
     def export_model(self):
-        print("[Export] Functionality not yet implemented")
+        signals.request_export_model.emit()
 
     # ------- Persistence helpers -------
     def get_agents(self):

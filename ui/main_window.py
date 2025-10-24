@@ -11,6 +11,7 @@ from ui.tabs.model_tab import ModelTab
 from ui.canvas.canvas_view import CanvasView
 from core.signals import signals
 from core.storage import save_config, load_config
+from core.exporter import export_model_files
 from core.ui_helpers import show_quiet_message
 
 class MainWindow(QMainWindow):
@@ -57,6 +58,7 @@ class MainWindow(QMainWindow):
 
         # When the Model tab requests to edit, open Agent Config prefilled
         signals.request_edit_agent.connect(self._open_edit_agent)
+        signals.request_export_model.connect(self._export_configuration)
 
     def _open_edit_agent(self, agent):
         self.tab_widget.setCurrentWidget(self.agent_config_tab)
@@ -84,17 +86,61 @@ class MainWindow(QMainWindow):
             filename += ".json"
 
         try:
-            agents = self.model_tab.get_agents()
-            layers = self.layers_tab.get_layers()
-            globals_ = self.globals_tab.get_globals()
-            connections = self.canvas.get_connections()
-            manual_layout = self.canvas.get_manual_layout()
+            agents, layers, globals_, connections, manual_layout = self._collect_configuration_data()
             save_config(filename, agents, layers, globals_, connections, manual_layout)
+            self._config_dir = Path(filename).resolve().parent
         except Exception as exc:
             QMessageBox.critical(self, "Save Failed", f"Could not save configuration:\n{exc}")
             return
 
         show_quiet_message(self, "Saved", f"Configuration saved to:\n{filename}")
+
+    def _collect_configuration_data(self):
+        agents = self.model_tab.get_agents()
+        layers = self.layers_tab.get_layers()
+        globals_ = self.globals_tab.get_globals()
+        connections = self.canvas.get_connections()
+        manual_layout = self.canvas.get_manual_layout()
+        return agents, layers, globals_, connections, manual_layout
+
+    def _export_configuration(self):
+        filename, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Configuration For Export",
+            str(self._config_dir),
+            "JSON Files (*.json)"
+        )
+        if not filename:
+            return
+        if not filename.lower().endswith(".json"):
+            filename += ".json"
+
+        template_path = (Path(__file__).resolve().parent.parent / "core" / "templates" / "main_template.txt").resolve()
+        output_dir = (Path(__file__).resolve().parent.parent / "model_files").resolve()
+
+        try:
+            agents, layers, globals_, connections, manual_layout = self._collect_configuration_data()
+            save_config(filename, agents, layers, globals_, connections, manual_layout)
+            self._config_dir = Path(filename).resolve().parent
+            model_name = Path(filename).stem
+            generated_path = export_model_files(
+                model_name=model_name,
+                template_path=template_path,
+                output_dir=output_dir,
+                agents=agents,
+                layers=layers,
+                globals_=globals_,
+                connections=connections
+            )
+        except Exception as exc:
+            QMessageBox.critical(self, "Export Failed", f"Could not export model files:\n{exc}")
+            return
+
+        show_quiet_message(
+            self,
+            "Exported",
+            f"Configuration saved to:\n{filename}\n\nGenerated file:\n{generated_path}"
+        )
 
     def _load_configuration(self):
         filename, _ = QFileDialog.getOpenFileName(

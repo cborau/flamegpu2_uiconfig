@@ -1,0 +1,335 @@
+from __future__ import annotations
+
+from datetime import datetime
+from pathlib import Path
+from typing import Iterable, Sequence
+
+from core.models import AgentType, GlobalVariable, Layer, DEFAULT_VAR_TYPE
+
+_MESSAGE_TYPE_KEYS: dict[str, str] = {
+    "MessageSpatial3D": "spatial",
+    "MessageArray3D": "grid",
+    "MessageBucket": "bucket",
+}
+
+_ENV_PROPERTY_METHODS: dict[str, str] = {
+    "Float": "newPropertyFloat",
+    "Int": "newPropertyInt",
+    "UInt8": "newPropertyUInt",
+    "ArrayFloat": "newPropertyArrayFloat",
+    "ArrayUInt": "newPropertyArrayUInt",
+}
+
+_AGENT_VARIABLE_METHODS: dict[str, str] = {
+    "Float": "newVariableFloat",
+    "Int": "newVariableInt",
+    "UInt8": "newVariableUInt8",
+    "ArrayFloat": "newVariableArrayFloat",
+    "ArrayUInt": "newVariableArrayUInt",
+}
+
+_MESSAGE_CONSTRUCTORS: dict[str, str] = {
+    "MessageSpatial3D": "newMessageSpatial3D",
+    "MessageArray3D": "newMessageArray3D",
+    "MessageBucket": "newMessageBucket",
+}
+
+_ARRAY_TYPES = {"ArrayFloat", "ArrayUInt"}
+
+
+def export_model_files(
+    model_name: str,
+    template_path: Path,
+    output_dir: Path,
+    agents: Sequence[AgentType],
+    layers: Sequence[Layer],
+    globals_: Sequence[GlobalVariable],
+    connections: Sequence[dict],
+    created_at: datetime | None = None,
+) -> Path:
+    """Render the main template with the provided model data and write it to disk."""
+    timestamp = created_at or datetime.now()
+    template = template_path.read_text(encoding="utf-8")
+
+    all_globals_block = _render_all_globals(globals_)
+    env_globals_block = _render_model_globals(globals_)
+    function_files_block = _render_function_files(agents)
+    messages_block, spatial_agents = _render_messages(agents)
+    agents_block = _render_agents(agents, connections or [])
+    layers_block = _render_layers(layers)
+
+    constants_block = _render_spatial_constants(spatial_agents)
+
+    replacements = {
+        "[PLACEHOLDER_MODEL_NAME]": model_name,
+        "[PLACEHOLDER_DATE]": timestamp.strftime("%d/%m/%Y - %H:%M:%S"),
+        "[PLACEHOLDER_ALL_GLOBALS]": all_globals_block,
+        "[PLACEHODER_MODEL_GLOBALS]": env_globals_block,
+        "[PLACEHOLDER_FUNCTION_FILES]": function_files_block,
+        "[PLACEHOLDER_MESSAGES]": messages_block,
+        "[PLACEHOLDER_AGENTS]": agents_block,
+        "[PLACEHOLDER_LAYERS]": layers_block,
+    }
+
+    for placeholder, value in replacements.items():
+        template = template.replace(placeholder, value)
+
+    template = template.replace("MAX_SEARCH_RADIUS_[PLACEHOLDER-AGENT_i_NAME]", constants_block)
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / f"{model_name}.py"
+    output_path.write_text(template, encoding="utf-8")
+    return output_path
+
+
+def _render_all_globals(globals_: Sequence[GlobalVariable]) -> str:
+    if not globals_:
+        return "# No global variables defined"
+
+    lines: list[str] = []
+    for glob in globals_:
+        literal = _format_literal(glob.var_type, glob.value)
+        lines.append(f"{glob.name} = {literal}")
+    return "\n".join(lines)
+
+
+def _render_model_globals(globals_: Sequence[GlobalVariable]) -> str:
+    if not globals_:
+        return "# No model globals configured"
+
+    lines: list[str] = []
+    for glob in globals_:
+        method = _ENV_PROPERTY_METHODS.get(glob.var_type, _ENV_PROPERTY_METHODS[DEFAULT_VAR_TYPE])
+        literal = _format_literal(glob.var_type, glob.value)
+        lines.append(f'env.{method}("{glob.name}", {literal})')
+    return "\n".join(lines)
+
+
+def _render_function_files(agents: Sequence[AgentType]) -> str:
+    blocks: list[str] = []
+    for agent in agents:
+        for func in agent.functions:
+            block_lines = [
+                "\"\"\"",
+                f"  {agent.name}",
+                "\"\"\"",
+                f'{func.name}_file = "{func.name}.cpp"',
+            ]
+            blocks.append("\n".join(block_lines))
+    return "\n\n".join(blocks) if blocks else "# No agent function files declared"
+
+
+def _render_messages(agents: Sequence[AgentType]) -> tuple[str, set[str]]:
+    blocks: list[str] = []
+    spatial_agents: set[str] = set()
+    seen: set[tuple[str, str]] = set()
+    for agent in agents:
+        for func in agent.functions:
+            msg_type = func.output_type
+            if msg_type == "MessageNone":
+                continue
+            key = (agent.name, msg_type)
+            if key in seen:
+                continue
+            seen.add(key)
+            constructor = _MESSAGE_CONSTRUCTORS.get(msg_type)
+            msg_key = _MESSAGE_TYPE_KEYS.get(msg_type)
+            if not constructor or not msg_key:
+                continue
+            var_name = f"{agent.name}_{msg_key}_location_message"
+            if msg_type == "MessageBucket":
+                block_lines = [
+                    f"{agent.name}_MAX_CONNECTIVITY = ? # the maximum expected connectivity of each node",
+                    f"{agent.name}_N_NODES = ? # number of nodes in the bucket network",
+                    f"{var_name} = model.newMessageBucket(\"{agent.name}_bucket_location_message\")",
+                    "# Set the range and bounds.",
+                    f"{var_name}.setBounds(0,{agent.name}_N_NODES + 8) # +8 because domain corners have idx from 1 to 8",
+                    f'{var_name}.newVariableInt("id")',
+                    f'{var_name}.newVariableFloat("x")',
+                    f'{var_name}.newVariableFloat("y")',
+                    f'{var_name}.newVariableFloat("z")',
+                    f'{var_name}.newVariableFloat("vx")',
+                    f'{var_name}.newVariableFloat("vy")',
+                    f'{var_name}.newVariableFloat("vz")',
+                    f'{var_name}.newVariableArrayUInt("linked_nodes", {agent.name}_MAX_CONNECTIVITY)',
+                ]
+            else:
+                block_lines = [
+                    f'{var_name} = model.{constructor}("{var_name}")'
+                ]
+            if msg_type == "MessageSpatial3D":
+                spatial_agents.add(agent.name)
+                block_lines.extend([
+                    f"{var_name}.setRadius(MAX_SEARCH_RADIUS_{agent.name})",
+                    f"{var_name}.setMin(MIN_EXPECTED_BOUNDARY_POS, MIN_EXPECTED_BOUNDARY_POS, MIN_EXPECTED_BOUNDARY_POS)",
+                    f"{var_name}.setMax(MAX_EXPECTED_BOUNDARY_POS, MAX_EXPECTED_BOUNDARY_POS, MAX_EXPECTED_BOUNDARY_POS)",
+                    f'{var_name}.newVariableInt("id")',
+                    "# TODO: add manually the rest of agent variables that need to be reported, execpt x, y, z which are automatically included in MessageSpatial3D messages",
+                ])
+            elif msg_type == "MessageArray3D":
+                block_lines.extend([
+                    f"{agent.name}_AGENTS_PER_DIR = [?, ?, ?]",
+                    f"{var_name}.setDimensions({agent.name}_AGENTS_PER_DIR[0], {agent.name}_AGENTS_PER_DIR[1], {agent.name}_AGENTS_PER_DIR[2])",
+                    f'{var_name}.newVariableInt("id")',
+                    f'{var_name}.newVariableFloat("x")',
+                    f'{var_name}.newVariableFloat("y")',
+                    f'{var_name}.newVariableFloat("z")',
+                    f'{var_name}.newVariableFloat("vx")',
+                    f'{var_name}.newVariableFloat("vy")',
+                    f'{var_name}.newVariableFloat("vz")',
+                    "# TODO: add manually the rest of agent variables that need to be reported",
+                ])
+            blocks.append("\n".join(block_lines))
+    return ("\n\n".join(blocks) if blocks else "# No location messages defined"), spatial_agents
+
+
+def _render_agents(agents: Sequence[AgentType], connections: Sequence[dict]) -> str:
+    if not agents:
+        return "# No agents available"
+
+    input_map = _build_input_map(connections)
+    blocks: list[str] = []
+    for agent in agents:
+        lines = [
+            '"""',
+            f"  {agent.name} agent",
+            '"""',
+            f'{agent.name}_agent = model.newAgent("{agent.name}")',
+            f'{agent.name}_agent.newVariableInt("id")',
+        ]
+
+        for var in agent.variables:
+            if var.name == "id":
+                continue
+            var_type = var.var_type or DEFAULT_VAR_TYPE
+            method = _AGENT_VARIABLE_METHODS.get(var_type, _AGENT_VARIABLE_METHODS[DEFAULT_VAR_TYPE])
+            if var_type in _ARRAY_TYPES:
+                caster = float if var_type == "ArrayFloat" else int
+                array_values = _parse_array(var.default, caster)
+                array_length = len(array_values)
+                lines.append(f'{agent.name}_agent.{method}("{var.name}", {array_length})')
+                lines.append("# TODO: default array values must be explicitly defined when initializing agent populations")
+            else:
+                literal = _format_literal(var_type, var.default)
+                lines.append(f'{agent.name}_agent.{method}("{var.name}", {literal})')
+
+        for func in agent.functions:
+            base = f'{agent.name}_agent.newRTCFunctionFile("{func.name}", {func.name}_file)'
+            suffix = ""
+            if func.output_type != "MessageNone":
+                msg_key = _MESSAGE_TYPE_KEYS.get(func.output_type)
+                if msg_key:
+                    suffix += f'.setMessageOutput("{agent.name}_{msg_key}_location_message ")'
+            if func.input_type != "MessageNone":
+                msg_key = _MESSAGE_TYPE_KEYS.get(func.input_type)
+                source_agent = _input_source_agent(agent.name, func.name, func.input_type, input_map)
+                missing_input = False
+                if msg_key and source_agent:
+                    suffix += f'.setMessageInput("{source_agent}_{msg_key}_location_message ")'
+                elif msg_key:
+                    missing_input = True
+                if missing_input:
+                    lines.append(f"# TODO: connect message input for {agent.name}::{func.name}")
+            lines.append(base + suffix)
+        blocks.append("\n".join(lines))
+    return "\n\n".join(blocks)
+
+
+def _render_layers(layers: Sequence[Layer]) -> str:
+    if not layers:
+        return "layer_count = 0\n# No layers defined"
+
+    lines = ["layer_count = 0"]
+    for layer in layers:
+        lines.append(f"# {layer.name}")
+        lines.append("layer_count += 1")
+        functions = list(getattr(layer, "function_ids", getattr(layer, "functions", [])))
+        for idx, func_id in enumerate(functions):
+            try:
+                agent_name, func_name = func_id.split("::", 1)
+            except ValueError:
+                continue
+            layer_accessor = "newLayer" if idx == 0 else "Layer"
+            lines.append(f'model.{layer_accessor}("{layer.name}").addAgentFunction("{agent_name}", "{func_name}")')
+    return "\n".join(lines)
+
+
+def _render_spatial_constants(spatial_agents: Iterable[str]) -> str:
+    agents = sorted(set(spatial_agents))
+    if not agents:
+        return "# MAX_SEARCH_RADIUS constants can be declared per agent when spatial messages are in use"
+    return "\n".join(f"MAX_SEARCH_RADIUS_{name} = ?" for name in agents)
+
+
+def _format_literal(var_type: str | None, raw_value: str | None) -> str:
+    var_type = var_type or DEFAULT_VAR_TYPE
+    raw = (raw_value or "").strip()
+    if var_type in _ARRAY_TYPES:
+        items = _parse_array(raw, float if var_type == "ArrayFloat" else int)
+        return "[" + ", ".join(_format_number(item) for item in items) + "]"
+    if var_type == "Int":
+        return str(_parse_int(raw))
+    if var_type == "UInt8":
+        return str(max(0, min(255, _parse_int(raw))))
+    # Default to float
+    return _format_number(_parse_float(raw))
+
+
+def _parse_array(raw: str | None, caster) -> list:
+    if not raw:
+        return []
+    value = raw.strip()
+    if value.startswith("[") and value.endswith("]"):
+        value = value[1:-1]
+    if not value:
+        return []
+    items = []
+    for part in value.split(","):
+        piece = part.strip()
+        if not piece:
+            continue
+        try:
+            items.append(caster(piece))
+        except (TypeError, ValueError):
+            continue
+    return items
+
+
+def _parse_int(raw: str | None) -> int:
+    try:
+        return int(raw.strip()) if raw else 0
+    except (ValueError, AttributeError):
+        return 0
+
+
+def _parse_float(raw: str | None) -> float:
+    try:
+        return float(raw.strip()) if raw else 0.0
+    except (ValueError, AttributeError):
+        return 0.0
+
+
+def _format_number(value: float | int) -> str:
+    if isinstance(value, int):
+        return str(value)
+    return repr(float(value))
+
+
+def _build_input_map(connections: Sequence[dict]) -> dict[str, dict[str, str]]:
+    mapping: dict[str, dict[str, str]] = {}
+    for conn in connections:
+        dst = conn.get("dst")
+        src = conn.get("src")
+        msg_type = conn.get("type")
+        if not dst or not src or not msg_type:
+            continue
+        mapping.setdefault(dst, {})[msg_type] = src
+    return mapping
+
+
+def _input_source_agent(agent_name: str, func_name: str, msg_type: str, input_map: dict[str, dict[str, str]]) -> str | None:
+    dst_key = f"{agent_name}::{func_name}"
+    src_identifier = input_map.get(dst_key, {}).get(msg_type)
+    if not src_identifier:
+        return None
+    return src_identifier.split("::", 1)[0]

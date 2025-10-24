@@ -20,6 +20,7 @@ class SignalBus(QObject):
 
     # Model-tab requests
     request_edit_agent = Signal(object)    # Emits AgentType (open AgentConfig prefilled)
+    request_export_model = Signal()
 
     # Connections (optional persistence/hooks)
     connection_added = Signal(dict)        # {"src": "Agent::Func", "dst": "Agent::Func", "type": "MessageSpatial3D"}
