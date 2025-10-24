@@ -1,11 +1,11 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QListWidget, QPushButton, QListWidgetItem,
-    QHBoxLayout, QMessageBox, QTableWidget, QTableWidgetItem, QAbstractItemView
+    QHBoxLayout, QMessageBox, QTableWidget, QTableWidgetItem, QAbstractItemView,
+    QComboBox, QHeaderView
 )
 from PySide6.QtGui import QColor
-from PySide6.QtCore import Qt
 from core.signals import signals
-from core.models import AgentType, AgentVariable, AgentFunction
+from core.models import AgentType, AgentVariable, AgentFunction, VAR_TYPE_OPTIONS, DEFAULT_VAR_TYPE
 from core.ui_helpers import show_quiet_message
 from copy import deepcopy
 
@@ -31,9 +31,11 @@ class ModelTab(QWidget):
 
         # Summary tables
         layout.addWidget(QLabel("Variables of Selected Agent:"))
-        self.vars_table = QTableWidget(0, 2)
-        self.vars_table.setHorizontalHeaderLabels(["Variable", "Default Value"])
+        self.vars_table = QTableWidget(0, 3)
+        self.vars_table.setHorizontalHeaderLabels(["Variable", "Type", "Default Value"])
         self.vars_table.setEditTriggers(QAbstractItemView.AllEditTriggers)
+        self.vars_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        self.vars_table.horizontalHeader().setStretchLastSection(True)
         layout.addWidget(self.vars_table)
 
         layout.addWidget(QLabel("Functions of Selected Agent:"))
@@ -106,7 +108,9 @@ class ModelTab(QWidget):
             r = self.vars_table.rowCount()
             self.vars_table.insertRow(r)
             self.vars_table.setItem(r, 0, QTableWidgetItem(v.name))
-            self.vars_table.setItem(r, 1, QTableWidgetItem(v.default))
+            combo = self._make_type_combo(getattr(v, "var_type", DEFAULT_VAR_TYPE))
+            self.vars_table.setCellWidget(r, 1, combo)
+            self.vars_table.setItem(r, 2, QTableWidgetItem(v.default))
         # Functions
         self.funcs_table.setRowCount(0)
         for f in agent.functions:
@@ -149,10 +153,12 @@ class ModelTab(QWidget):
         new_vars = []
         for r in range(self.vars_table.rowCount()):
             name_item = self.vars_table.item(r, 0)
-            val_item  = self.vars_table.item(r, 1)
+            type_combo = self.vars_table.cellWidget(r, 1)
+            val_item  = self.vars_table.item(r, 2)
             if not name_item:
                 continue
-            new_vars.append(AgentVariable(name_item.text(), val_item.text() if val_item else ""))
+            var_type = type_combo.currentText() if isinstance(type_combo, QComboBox) else DEFAULT_VAR_TYPE
+            new_vars.append(AgentVariable(name_item.text(), val_item.text() if val_item else "", var_type))
 
         new_funcs = []
         for r in range(self.funcs_table.rowCount()):
@@ -197,3 +203,12 @@ class ModelTab(QWidget):
     def replace_agents(self, agents):
         self.clear_agents()
         self.load_agents(agents)
+
+    def _make_type_combo(self, current: str | None = None):
+        combo = QComboBox()
+        combo.addItems(VAR_TYPE_OPTIONS)
+        if current in VAR_TYPE_OPTIONS:
+            combo.setCurrentText(current)
+        else:
+            combo.setCurrentText(DEFAULT_VAR_TYPE)
+        return combo

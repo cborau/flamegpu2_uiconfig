@@ -1,6 +1,6 @@
 import json
 from dataclasses import asdict
-from core.models import AgentType, AgentFunction, AgentVariable, Layer, GlobalVariable
+from core.models import AgentType, AgentFunction, AgentVariable, Layer, GlobalVariable, DEFAULT_VAR_TYPE
 
 
 def save_config(filename, agents, layers, globals_, connections=None, layout=None):
@@ -35,7 +35,7 @@ def load_config(filename):
 
     globals_ = []
     for g in data.get("globals", []):
-        globals_.append(GlobalVariable(g.get("name", ""), g.get("value", "")))
+        globals_.append(GlobalVariable(g.get("name", ""), g.get("value", ""), g.get("var_type", DEFAULT_VAR_TYPE)))
 
     connections = data.get("connections", [])
     layout = data.get("manual_layout", {})

@@ -1,10 +1,14 @@
 from dataclasses import dataclass, field
 from typing import List, Optional
 
+VAR_TYPE_OPTIONS = ["UInt8", "Int", "Float", "ArrayUInt", "ArrayFloat"]
+DEFAULT_VAR_TYPE = "Float"
+
 @dataclass
 class AgentVariable:
     name: str
     default: str
+    var_type: str = DEFAULT_VAR_TYPE
 
 @dataclass
 class AgentFunction:
@@ -30,3 +34,4 @@ class Layer:
 class GlobalVariable:
     name: str
     value: str
+    var_type: str = DEFAULT_VAR_TYPE

@@ -6,27 +6,33 @@
       "variables": [
         {
           "name": "x",
-          "default": "0.0"
+          "default": "1",
+          "var_type": "Int"
         },
         {
           "name": "y",
-          "default": "0.0"
+          "default": "0.0",
+          "var_type": "Float"
         },
         {
           "name": "z",
-          "default": "0.0"
+          "default": "0.0",
+          "var_type": "Float"
         },
         {
           "name": "vx",
-          "default": "0.0"
+          "default": "0.0",
+          "var_type": "Float"
         },
         {
           "name": "vy",
-          "default": "0.0"
+          "default": "0.0",
+          "var_type": "Float"
         },
         {
           "name": "vz",
-          "default": "0.0"
+          "default": "0.0",
+          "var_type": "Float"
         }
       ],
       "functions": [
@@ -50,27 +56,33 @@
       "variables": [
         {
           "name": "x",
-          "default": "0.0"
+          "default": "0.0",
+          "var_type": "Float"
         },
         {
           "name": "y",
-          "default": "0.0"
+          "default": "0.0",
+          "var_type": "Float"
         },
         {
           "name": "z",
-          "default": "0.0"
+          "default": "0.0",
+          "var_type": "Float"
         },
         {
           "name": "vx",
-          "default": "0.0"
+          "default": "0.0",
+          "var_type": "Float"
         },
         {
           "name": "vy",
-          "default": "0.0"
+          "default": "0.0",
+          "var_type": "Float"
         },
         {
           "name": "vz",
-          "default": "0.0"
+          "default": "0.0",
+          "var_type": "Float"
         }
       ],
       "functions": [
@@ -91,11 +103,12 @@
   ],
   "layers": [
     {
-      "name": "L1",
+      "name": "Prueba",
       "function_ids": [
         "cell::function1",
         "ecm::function3"
-      ]
+      ],
+      "height": 357.49856328392246
     },
     {
       "name": "L2",
@@ -103,13 +116,15 @@
         "cell::function2",
         "ecm::function3",
         "ecm::function4"
-      ]
+      ],
+      "height": null
     },
     {
       "name": "L3",
       "function_ids": [
         "ecm::function4"
-      ]
+      ],
+      "height": null
     }
   ],
   "globals": [],
@@ -127,13 +142,68 @@
       "type": "MessageSpatial3D",
       "src_layer": "L1",
       "dst_layer": "L1"
-    },
-    {
-      "src": "cell::function2",
-      "dst": "ecm::function4",
-      "type": "MessageNone",
-      "src_layer": "L2",
-      "dst_layer": "L2"
     }
-  ]
+  ],
+  "manual_layout": {
+    "agents": {
+      "Prueba": {
+        "cell": [
+          80.0,
+          206.74928164196123
+        ],
+        "ecm": [
+          365.9351698973774,
+          111.09810718358037
+        ]
+      },
+      "L2": {
+        "cell": [
+          80.0,
+          525.4985632839225
+        ],
+        "ecm": [
+          648.1061345496009,
+          515.9334458380844
+        ]
+      },
+      "L3": {
+        "ecm": [
+          80.0,
+          775.4985632839225
+        ]
+      }
+    },
+    "functions": {
+      "Prueba": {
+        "cell::function1": [
+          173.5,
+          206.74928164196123
+        ],
+        "ecm::function3": [
+          476.1741254275941,
+          273.70510376282783
+        ]
+      },
+      "L2": {
+        "ecm::function3": [
+          504.86947776510834,
+          483.7814093500571
+        ],
+        "cell::function2": [
+          173.5,
+          525.4985632839225
+        ],
+        "ecm::function4": [
+          496.5,
+          544.4985632839225
+        ]
+      },
+      "L3": {
+        "ecm::function4": [
+          173.5,
+          775.4985632839225
+        ]
+      }
+    }
+  }
 }
