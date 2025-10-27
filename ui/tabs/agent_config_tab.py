@@ -4,7 +4,15 @@ from PySide6.QtWidgets import (
     QAbstractItemView, QHeaderView
 )
 from PySide6.QtGui import QIcon, QColor
-from core.models import AgentType, AgentVariable, AgentFunction, VAR_TYPE_OPTIONS, DEFAULT_VAR_TYPE
+from core.models import (
+    AgentType,
+    AgentVariable,
+    AgentFunction,
+    VAR_TYPE_OPTIONS,
+    DEFAULT_VAR_TYPE,
+    AGENT_LOGGING_OPTIONS,
+    DEFAULT_LOGGING_OPTION,
+)
 from core.signals import signals
 from core.ui_helpers import show_quiet_message
 
@@ -45,11 +53,12 @@ class AgentConfigTab(QWidget):
         layout.addLayout(color_btn_layout)
 
         layout.addWidget(QLabel("Variables (name, type, default):"))
-        self.vars_table = QTableWidget(0, 4)
-        self.vars_table.setHorizontalHeaderLabels(["Variable", "Type", "Default Value", ""])
+        self.vars_table = QTableWidget(0, 5)
+        self.vars_table.setHorizontalHeaderLabels(["Variable", "Type", "Default Value", "Logging", ""])
         self.vars_table.setEditTriggers(QAbstractItemView.AllEditTriggers)
         self.vars_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
         self.vars_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        self.vars_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
         self.vars_table.horizontalHeader().setStretchLastSection(False)
         layout.addWidget(self.vars_table)
 
@@ -95,7 +104,7 @@ class AgentConfigTab(QWidget):
 
     def populate_default_variables(self):
         for var in ["x", "y", "z", "vx", "vy", "vz"]:
-            self.add_variable_row(name=var, var_type=DEFAULT_VAR_TYPE, default="0.0")
+            self.add_variable_row(name=var, var_type=DEFAULT_VAR_TYPE, default="0.0", logging=DEFAULT_LOGGING_OPTION)
 
     def choose_color(self):
         color = QColorDialog.getColor()
@@ -104,16 +113,24 @@ class AgentConfigTab(QWidget):
             self.color_label.setText(color.name())
             self.color_label.setStyleSheet(f"background-color: {color.name()}")
 
-    def add_variable_row(self, name="", var_type: str = DEFAULT_VAR_TYPE, default=""):
+    def add_variable_row(
+        self,
+        name: str = "",
+        var_type: str = DEFAULT_VAR_TYPE,
+        default: str = "",
+        logging: str = DEFAULT_LOGGING_OPTION,
+    ):
         row = self.vars_table.rowCount()
         self.vars_table.insertRow(row)
         self.vars_table.setItem(row, 0, QTableWidgetItem(name))
         combo = self._make_type_combo(var_type)
         self.vars_table.setCellWidget(row, 1, combo)
         self.vars_table.setItem(row, 2, QTableWidgetItem(default))
+        logging_combo = self._make_logging_combo(logging)
+        self.vars_table.setCellWidget(row, 3, logging_combo)
         btn = self._make_delete_button(self.vars_table)
         btn.clicked.connect(lambda _, b=btn: self.remove_variable_row(b))
-        self.vars_table.setCellWidget(row, 3, btn)
+        self.vars_table.setCellWidget(row, 4, btn)
 
     def _make_type_combo(self, current: str | None = None):
         combo = QComboBox()
@@ -122,6 +139,16 @@ class AgentConfigTab(QWidget):
             combo.setCurrentText(current)
         else:
             combo.setCurrentText(DEFAULT_VAR_TYPE)
+        return combo
+
+
+    def _make_logging_combo(self, current: str | None = None):
+        combo = QComboBox()
+        combo.addItems(AGENT_LOGGING_OPTIONS)
+        if current in AGENT_LOGGING_OPTIONS:
+            combo.setCurrentText(current)
+        else:
+            combo.setCurrentText(DEFAULT_LOGGING_OPTION)
         return combo
 
 
@@ -205,7 +232,12 @@ class AgentConfigTab(QWidget):
 
         self.vars_table.setRowCount(0)
         for var in agent.variables:
-            self.add_variable_row(var.name, getattr(var, "var_type", DEFAULT_VAR_TYPE), var.default)
+            self.add_variable_row(
+                var.name,
+                getattr(var, "var_type", DEFAULT_VAR_TYPE),
+                var.default,
+                getattr(var, "logging", DEFAULT_LOGGING_OPTION),
+            )
 
         self.funcs_table.setRowCount(0)
         for func in agent.functions:
@@ -230,7 +262,12 @@ class AgentConfigTab(QWidget):
 
         self.vars_table.setRowCount(0)
         for v in agent.variables:
-            self.add_variable_row(v.name, getattr(v, "var_type", DEFAULT_VAR_TYPE), v.default)
+            self.add_variable_row(
+                v.name,
+                getattr(v, "var_type", DEFAULT_VAR_TYPE),
+                v.default,
+                getattr(v, "logging", DEFAULT_LOGGING_OPTION),
+            )
 
         self.funcs_table.setRowCount(0)
         for f in agent.functions:
@@ -253,11 +290,12 @@ class AgentConfigTab(QWidget):
             var_item = self.vars_table.item(row, 0)
             type_combo = self.vars_table.cellWidget(row, 1)
             val_item = self.vars_table.item(row, 2)
+            logging_combo = self.vars_table.cellWidget(row, 3)
             if not var_item:
                 continue
             var_type = type_combo.currentText() if isinstance(type_combo, QComboBox) else DEFAULT_VAR_TYPE
-            variables.append(AgentVariable(var_item.text(), val_item.text() if val_item else "", var_type))
-
+            logging_value = logging_combo.currentText() if isinstance(logging_combo, QComboBox) else DEFAULT_LOGGING_OPTION
+            variables.append(AgentVariable(var_item.text(), val_item.text() if val_item else "", var_type, logging_value))
         functions = []
         for row in range(self.funcs_table.rowCount()):
             fname_item = self.funcs_table.item(row, 0)

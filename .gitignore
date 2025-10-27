@@ -210,3 +210,4 @@ configs/example2.json
 core/templates/InstructionsCo.txt
 model_files/example3.py
 configs/example3.json
+.vscode/settings.json

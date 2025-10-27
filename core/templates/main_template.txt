@@ -23,11 +23,17 @@ MIN_EXPECTED_BOUNDARY_POS = -?
 MAX_SEARCH_RADIUS_[PLACEHOLDER-AGENT_i_NAME] = ?
 SAVE_EVERY_N_STEPS = ?
 SAVE_DATA_TO_FILE = False
+BOUNDARY_COORDS = [?, ?, ?, ?, ?, ?] # +X,-X,+Y,-Y,+Z,-Z
 
 
 # +====================================================================+
 # | FLAMEGPU2 IMPLEMENTATION                                           |
 # +====================================================================+
+
+
+"""
+AGENT Files
+"""
 # Files containing agent functions for agents, which outputs publicly visible properties to a message list
 
 # Agent function files
@@ -46,6 +52,16 @@ env.newPropertyUInt("CURRENT_ID", 0)
 env.newPropertyUInt("STEPS", STEPS)
 # Time increment 
 env.newPropertyFloat("TIME_STEP", TIME_STEP)
+
+# ------------------------------------------------------
+# BOUNDARY BEHAVIOUR 
+# ------------------------------------------------------
+# Boundaries position
+bcs = [BOUNDARY_COORDS[0], BOUNDARY_COORDS[1], 
+      BOUNDARY_COORDS[2], BOUNDARY_COORDS[3], 
+      BOUNDARY_COORDS[4], BOUNDARY_COORDS[5]]  # +X,-X,+Y,-Y,+Z,-Z
+env.newPropertyArrayFloat("BOUNDARY_COORDS", bcs)
+
 
 # Model globals
 [PLACEHODER_MODEL_GLOBALS]
@@ -77,8 +93,8 @@ env.newPropertyFloat("EPSILON", EPSILON)
 class initAgentPopulations(pyflamegpu.HostFunction):
     def run(self, FLAMEGPU):
         # TODO: code the initialization of agents. For example:
-		# instance = FLAMEGPU.agent("AGENT_NAME").newAgent()
-		# instance.setVariableFloat("VARX", 0.0)
+        # instance = FLAMEGPU.agent("AGENT_NAME").newAgent()
+        # instance.setVariableFloat("VARX", 0.0)
         
         return
 
@@ -96,16 +112,16 @@ model.addInitFunction(initialAgentPopulation)
 class SaveDataToFile(pyflamegpu.HostFunction):
     def __init__(self):
         super().__init__()
-		# TODO: code constructor
+        # TODO: code constructor
 
     def run(self, FLAMEGPU):
-	
-		global SAVE_DATA_TO_FILE, SAVE_EVERY_N_STEP
+    
+        global SAVE_DATA_TO_FILE, SAVE_EVERY_N_STEP
         stepCounter = FLAMEGPU.getStepCounter() + 1
         
         if SAVE_DATA_TO_FILE:
             if stepCounter % SAVE_EVERY_N_STEPS == 0 or stepCounter == 1:
-				# TODO: code to save data function
+                # TODO: code to save data function
                 
 
 

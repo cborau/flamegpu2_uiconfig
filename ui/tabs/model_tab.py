@@ -5,7 +5,15 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import QColor
 from core.signals import signals
-from core.models import AgentType, AgentVariable, AgentFunction, VAR_TYPE_OPTIONS, DEFAULT_VAR_TYPE
+from core.models import (
+    AgentType,
+    AgentVariable,
+    AgentFunction,
+    VAR_TYPE_OPTIONS,
+    DEFAULT_VAR_TYPE,
+    AGENT_LOGGING_OPTIONS,
+    DEFAULT_LOGGING_OPTION,
+)
 from core.ui_helpers import show_quiet_message
 from copy import deepcopy
 
@@ -31,11 +39,12 @@ class ModelTab(QWidget):
 
         # Summary tables
         layout.addWidget(QLabel("Variables of Selected Agent:"))
-        self.vars_table = QTableWidget(0, 3)
-        self.vars_table.setHorizontalHeaderLabels(["Variable", "Type", "Default Value"])
+        self.vars_table = QTableWidget(0, 4)
+        self.vars_table.setHorizontalHeaderLabels(["Variable", "Type", "Default Value", "Logging"])
         self.vars_table.setEditTriggers(QAbstractItemView.AllEditTriggers)
         self.vars_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        self.vars_table.horizontalHeader().setStretchLastSection(True)
+        self.vars_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        self.vars_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
         layout.addWidget(self.vars_table)
 
         layout.addWidget(QLabel("Functions of Selected Agent:"))
@@ -111,6 +120,8 @@ class ModelTab(QWidget):
             combo = self._make_type_combo(getattr(v, "var_type", DEFAULT_VAR_TYPE))
             self.vars_table.setCellWidget(r, 1, combo)
             self.vars_table.setItem(r, 2, QTableWidgetItem(v.default))
+            logging_combo = self._make_logging_combo(getattr(v, "logging", DEFAULT_LOGGING_OPTION))
+            self.vars_table.setCellWidget(r, 3, logging_combo)
         # Functions
         self.funcs_table.setRowCount(0)
         for f in agent.functions:
@@ -155,10 +166,12 @@ class ModelTab(QWidget):
             name_item = self.vars_table.item(r, 0)
             type_combo = self.vars_table.cellWidget(r, 1)
             val_item  = self.vars_table.item(r, 2)
+            logging_combo = self.vars_table.cellWidget(r, 3)
             if not name_item:
                 continue
             var_type = type_combo.currentText() if isinstance(type_combo, QComboBox) else DEFAULT_VAR_TYPE
-            new_vars.append(AgentVariable(name_item.text(), val_item.text() if val_item else "", var_type))
+            logging_value = logging_combo.currentText() if isinstance(logging_combo, QComboBox) else DEFAULT_LOGGING_OPTION
+            new_vars.append(AgentVariable(name_item.text(), val_item.text() if val_item else "", var_type, logging_value))
 
         new_funcs = []
         for r in range(self.funcs_table.rowCount()):
@@ -211,4 +224,13 @@ class ModelTab(QWidget):
             combo.setCurrentText(current)
         else:
             combo.setCurrentText(DEFAULT_VAR_TYPE)
+        return combo
+
+    def _make_logging_combo(self, current: str | None = None):
+        combo = QComboBox()
+        combo.addItems(AGENT_LOGGING_OPTIONS)
+        if current in AGENT_LOGGING_OPTIONS:
+            combo.setCurrentText(current)
+        else:
+            combo.setCurrentText(DEFAULT_LOGGING_OPTION)
         return combo

@@ -9,10 +9,11 @@ class GlobalsTab(QWidget):
         layout = QVBoxLayout(self)
 
         layout.addWidget(QLabel("Global Variables (name, type, value):"))
-        self.globals_table = QTableWidget(0, 3)
-        self.globals_table.setHorizontalHeaderLabels(["Name", "Type", "Value"])
+        self.globals_table = QTableWidget(0, 4)
+        self.globals_table.setHorizontalHeaderLabels(["Name", "Type", "Value", "MacroProperty"])
         self.globals_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        self.globals_table.horizontalHeader().setStretchLastSection(True)
+        self.globals_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        self.globals_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
         layout.addWidget(self.globals_table)
 
         self.add_btn = QPushButton("Add Variable")
@@ -26,6 +27,7 @@ class GlobalsTab(QWidget):
         combo = self._make_type_combo(DEFAULT_VAR_TYPE)
         self.globals_table.setCellWidget(row, 1, combo)
         self.globals_table.setItem(row, 2, QTableWidgetItem(""))
+        self.globals_table.setItem(row, 3, self._make_macro_item(False))
 
     def get_globals(self):
         globals_list = []
@@ -33,12 +35,14 @@ class GlobalsTab(QWidget):
             name_item = self.globals_table.item(row, 0)
             type_combo = self.globals_table.cellWidget(row, 1)
             value_item = self.globals_table.item(row, 2)
+            macro_item = self.globals_table.item(row, 3)
             name = name_item.text().strip() if name_item else ""
             if not name:
                 continue
             value = value_item.text() if value_item else ""
             var_type = type_combo.currentText() if isinstance(type_combo, QComboBox) else DEFAULT_VAR_TYPE
-            globals_list.append(GlobalVariable(name, value, var_type))
+            is_macro = macro_item.checkState() == Qt.Checked if macro_item else False
+            globals_list.append(GlobalVariable(name, value, var_type, is_macro))
         return globals_list
 
     def load_globals(self, globals_list):
@@ -50,6 +54,7 @@ class GlobalsTab(QWidget):
             combo = self._make_type_combo(getattr(glob, "var_type", DEFAULT_VAR_TYPE))
             self.globals_table.setCellWidget(row, 1, combo)
             self.globals_table.setItem(row, 2, QTableWidgetItem(glob.value))
+            self.globals_table.setItem(row, 3, self._make_macro_item(getattr(glob, "is_macro", False)))
 
     def clear_globals(self):
         self.globals_table.setRowCount(0)
@@ -63,3 +68,10 @@ class GlobalsTab(QWidget):
             combo.setCurrentText(DEFAULT_VAR_TYPE)
         combo.setFocusPolicy(Qt.StrongFocus)
         return combo
+
+    def _make_macro_item(self, checked: bool):
+        item = QTableWidgetItem()
+        item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsUserCheckable)
+        item.setCheckState(Qt.Checked if checked else Qt.Unchecked)
+        item.setText("")
+        return item
