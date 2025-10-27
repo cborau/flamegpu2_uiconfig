@@ -106,8 +106,7 @@ The main window opens with a tabbed editor on the left and a topology canvas on 
 ## Tips & Best Practices
 
 - Use descriptive names for layers and functions; these feed directly into the template.
-- Macro globals are flagged so exporters can emit the correct `env.newMacroProperty…` logic (once implemented).
-- Keep placeholder `?` values in exported files until you know model-specific constants—search for `?` to locate them quickly.
+- Check placeholder `?` values and TODO flags in exported files to fit model-specific needs.
 
 ## Troubleshooting
 
@@ -122,4 +121,4 @@ See [`LICENSE`](LICENSE) for details.
 ## Acknowledgements
 
 - FLAME GPU 2 project and documentation.
-- Contributors providing templates and initial scaffolding.
+
