@@ -143,7 +143,7 @@ def _render_messages(agents: Sequence[AgentType]) -> tuple[str, set[str]]:
                     f"{agent.name}_N_NODES = ? # number of nodes in the bucket network",
                     f"{var_name} = model.newMessageBucket(\"{agent.name}_bucket_location_message\")",
                     "# Set the range and bounds.",
-                    f"{var_name}.setBounds(0,{agent.name}_N_NODES + 8) # +8 because domain corners have idx from 1 to 8",
+                    f"{var_name}.setBounds(0,{agent.name}_N_NODES)",
                     f'{var_name}.newVariableInt("id")',
                     f'{var_name}.newVariableFloat("x")',
                     f'{var_name}.newVariableFloat("y")',

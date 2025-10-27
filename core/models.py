@@ -4,7 +4,7 @@ from typing import List, Optional
 VAR_TYPE_OPTIONS = ["UInt8", "Int", "Float", "ArrayUInt", "ArrayFloat"]
 DEFAULT_VAR_TYPE = "Float"
 
-AGENT_LOGGING_OPTIONS = ["Mean", "Min", "Max", "Sum", "Std"]
+AGENT_LOGGING_OPTIONS = ["NoLog", "Mean", "Min", "Max", "Sum", "Std"]
 DEFAULT_LOGGING_OPTION = AGENT_LOGGING_OPTIONS[0]
 
 VISUALIZATION_SHAPES = ["ICOSPHERE", "CUBE", "PYRAMID", "ARROWHEAD"]

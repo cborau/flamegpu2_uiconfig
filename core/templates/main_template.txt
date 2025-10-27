@@ -8,7 +8,7 @@
 # | IMPORTS                                                            |
 # +====================================================================+
 from pyflamegpu import *
-
+import pathlib
 
 # +====================================================================+
 # | GLOBAL PARAMETERS                                                  |
@@ -24,7 +24,13 @@ MAX_SEARCH_RADIUS_[PLACEHOLDER-AGENT_i_NAME] = ?
 SAVE_EVERY_N_STEPS = ?
 SAVE_DATA_TO_FILE = False
 BOUNDARY_COORDS = [?, ?, ?, ?, ?, ?] # +X,-X,+Y,-Y,+Z,-Z
-
+VISUALISATION = ?
+DEBUG_PRINTING = False
+ENSEMBLE = False # set to True of parallel exeqution
+ENSEMBLE_RUNS = 0
+CURR_PATH = pathlib.Path().absolute()
+RES_PATH = CURR_PATH / 'result_files'
+RES_PATH.mkdir(parents=True, exist_ok=True)
 
 # +====================================================================+
 # | FLAMEGPU2 IMPLEMENTATION                                           |
@@ -141,283 +147,103 @@ model.addStepFunction(sdf)
 [PLACEHOLDER_LAYERS]
 
 
+"""
+  Logging
+"""
 
 # Create and configure logging details 
 logging_config = pyflamegpu.LoggingConfig(model)
-logging_config.logEnvironment("CURRENT_ID")
-logging_config.logEnvironment("COORDS_BOUNDARIES")
-fnode_agent_log = logging_config.agent("FNODE")
-fnode_agent_log.logCount()
-fnode_agent_log.logSumFloat("f_bx_pos")
-fnode_agent_log.logSumFloat("f_bx_neg")
-fnode_agent_log.logSumFloat("f_by_pos")
-fnode_agent_log.logSumFloat("f_by_neg")
-fnode_agent_log.logSumFloat("f_bz_pos")
-fnode_agent_log.logSumFloat("f_bz_neg")
 
-fnode_agent_log.logSumFloat("f_bx_pos_y")
-fnode_agent_log.logSumFloat("f_bx_pos_z")
-fnode_agent_log.logSumFloat("f_bx_neg_y")
-fnode_agent_log.logSumFloat("f_bx_neg_z")
-fnode_agent_log.logSumFloat("f_by_pos_x")
-fnode_agent_log.logSumFloat("f_by_pos_z")
-fnode_agent_log.logSumFloat("f_by_neg_x")
-fnode_agent_log.logSumFloat("f_by_neg_z")
-fnode_agent_log.logSumFloat("f_bz_pos_x")
-fnode_agent_log.logSumFloat("f_bz_pos_y")
-fnode_agent_log.logSumFloat("f_bz_neg_x")
-fnode_agent_log.logSumFloat("f_bz_neg_y")
-
-fnode_agent_log.logMeanFloat("f_bx_pos")
-fnode_agent_log.logMeanFloat("f_bx_neg")
-fnode_agent_log.logMeanFloat("f_by_pos")
-fnode_agent_log.logMeanFloat("f_by_neg")
-fnode_agent_log.logMeanFloat("f_bz_pos")
-fnode_agent_log.logMeanFloat("f_bz_neg")
-fnode_agent_log.logStandardDevFloat("f_bx_pos")
-fnode_agent_log.logStandardDevFloat("f_bx_neg")
-fnode_agent_log.logStandardDevFloat("f_by_pos")
-fnode_agent_log.logStandardDevFloat("f_by_neg")
-fnode_agent_log.logStandardDevFloat("f_bz_pos")
-fnode_agent_log.logStandardDevFloat("f_bz_neg")
+[PLACEHOLDER_LOGGING]
 
 step_log = pyflamegpu.StepLoggingConfig(logging_config)
-step_log.setFrequency(1)
+step_log.setFrequency(1) # if 1, data will be logged every step
 
 """
   Create Model Runner
 """
-simulation = pyflamegpu.CUDASimulation(model)
-simulation.SimulationConfig().steps = STEPS
-simulation.setStepLog(step_log)
-simulation.setExitLog(logging_config)
+if ENSEMBLE:
+    """
+    Create Run Plan Vector
+    """
+    run_plan_vector = pyflamegpu.RunPlanVector(model, ENSEMBLE_RUNS)
+    run_plan_vector.setSteps(env.getPropertyUInt("STEPS"))
+    simulation_seed = random.randint(0, 99999)
+    run_plan_vector.setRandomSimulationSeed(simulation_seed, 1000)
+    simulation = pyflamegpu.CUDAEnsemble(model)
 
-"""
-  Create Visualisation
-"""
-if pyflamegpu.VISUALISATION and VISUALISATION and not ENSEMBLE:
-    visualisation = simulation.getVisualisation()
-    # Configure vis
-    envWidth = MAX_EXPECTED_BOUNDARY_POS - MIN_EXPECTED_BOUNDARY_POS
-    INIT_CAM = MAX_EXPECTED_BOUNDARY_POS * 4.5
-    # Visualisation.setInitialCameraLocation(INIT_CAM * 2, INIT_CAM, INIT_CAM)
-    visualisation.setInitialCameraLocation(0.0, 0.0, INIT_CAM)
-    visualisation.setCameraSpeed(0.002 * envWidth)
-    if DEBUG_PRINTING:
-        visualisation.setSimulationSpeed(1)
-    visualisation.setBeginPaused(True)
-    circ_fnode_agt = visualisation.addAgent("FNODE")
-    # Position vars are named x, y, z so they are used by default
-    circ_fnode_agt.setModel(pyflamegpu.ICOSPHERE)
-    # circ_fnode_agt.setModelScale(env.getPropertyFloat("ECM_ECM_INTERACTION_RADIUS")/7.5)
-    circ_fnode_agt.setModelScale(0.03 * envWidth)
-    circ_fnode_agt.setColor(pyflamegpu.GREEN)
-    # circ_fnode_agt.setColor(pyflamegpu.ViridisInterpolation("y", -1.0, 1.0))
-    # circ_fnode_agt.setColor(pyflamegpu.HSVInterpolation("y", 0.0, 360.0))
-    f_max = FIBRE_SEGMENT_K_ELAST * (FIBRE_SEGMENT_EQUILIBRIUM_DISTANCE)
-    max_energy = 0.5 * (f_max * f_max) / FIBRE_SEGMENT_K_ELAST
-    print("max force, max energy: ", f_max, max_energy)
-    circ_fnode_agt.setColor(pyflamegpu.HSVInterpolation.GREENRED("elastic_energy", 0.00000001, max_energy * 1.0))
-    square_bcorner_agt = visualisation.addAgent("BCORNER")
-    square_bcorner_agt.setModel(pyflamegpu.CUBE)
-    square_bcorner_agt.setModelScale(0.025 * envWidth)
-    square_bcorner_agt.setColor(pyflamegpu.RED)
-            
-    coord_boundary = list(env.getPropertyArrayFloat("COORDS_BOUNDARIES"))
-    pen = visualisation.newLineSketch(1, 1, 1, 0.8)
-    pen.addVertex(coord_boundary[0], coord_boundary[2], coord_boundary[4])
-    pen.addVertex(coord_boundary[0], coord_boundary[2], coord_boundary[5])
-    pen.addVertex(coord_boundary[0], coord_boundary[3], coord_boundary[4])
-    pen.addVertex(coord_boundary[0], coord_boundary[3], coord_boundary[5])
-    pen.addVertex(coord_boundary[1], coord_boundary[2], coord_boundary[4])
-    pen.addVertex(coord_boundary[1], coord_boundary[2], coord_boundary[5])
-    pen.addVertex(coord_boundary[1], coord_boundary[3], coord_boundary[4])
-    pen.addVertex(coord_boundary[1], coord_boundary[3], coord_boundary[5])
+    """
+    Create Control Run Plan
+    """
+    # Create a control run plan, this will define the common properties across all plans
+    # https://docs.flamegpu.com/guide/running-multiple-simulations/index.html#creating-a-runplanvector
+    run_control = pyflamegpu.RunPlan(model)
 
-    pen.addVertex(coord_boundary[0], coord_boundary[2], coord_boundary[4])
-    pen.addVertex(coord_boundary[0], coord_boundary[3], coord_boundary[4])
-    pen.addVertex(coord_boundary[0], coord_boundary[2], coord_boundary[5])
-    pen.addVertex(coord_boundary[0], coord_boundary[3], coord_boundary[5])
-    pen.addVertex(coord_boundary[1], coord_boundary[2], coord_boundary[4])
-    pen.addVertex(coord_boundary[1], coord_boundary[3], coord_boundary[4])
-    pen.addVertex(coord_boundary[1], coord_boundary[2], coord_boundary[5])
-    pen.addVertex(coord_boundary[1], coord_boundary[3], coord_boundary[5])
+    # Ensure that repeated runs use the same Random values within the RunPlans
+    run_control.setRandomPropertySeed(34523) # This method only exists at the vector level, if you're not using setPropertyRandom(), it woud have no effect.
+    # All runs have the same steps
+    run_control.setSteps(STEPS)
+    run_control.setPropertyUInt("STEPS", STEPS)
 
-    pen.addVertex(coord_boundary[0], coord_boundary[2], coord_boundary[4])
-    pen.addVertex(coord_boundary[1], coord_boundary[2], coord_boundary[4])
-    pen.addVertex(coord_boundary[0], coord_boundary[3], coord_boundary[4])
-    pen.addVertex(coord_boundary[1], coord_boundary[3], coord_boundary[4])
-    pen.addVertex(coord_boundary[0], coord_boundary[2], coord_boundary[5])
-    pen.addVertex(coord_boundary[1], coord_boundary[2], coord_boundary[5])
-    pen.addVertex(coord_boundary[0], coord_boundary[3], coord_boundary[5])
-    pen.addVertex(coord_boundary[1], coord_boundary[3], coord_boundary[5])
+    # Create the first dimension of the parameter sweep
+    ensemble_runs = pyflamegpu.RunPlanVector(model, 0)
+	# Example: varying 3 model variables to check model sensitivity
+    for VARIABLE_1_value in np.linspace(?, ?, ?): # min, max, number of divisions
+    #    for VARIABLE_2_value in np.linspace(?, ?, ?):
+    #        for VARIABLE_3_value in np.linspace(?, ?, ?):
+    #            run_control.setPropertyFloat("VARIABLE_1", VARIABLE_1_value)
+    #            run_control.setPropertyFloat("VARIABLE_2", VARIABLE_2_value)
+    #            run_control.setPropertyFloat("VARIABLE_3", VARIABLE_3_value)
+    #            ensemble_runs += run_control
+    #            dir_name = f"VARIABLE_1_{VARIABLE_1_value:.3f}_VARIABLE_2_{VARIABLE_2_value:.3f}_VARIABLE_3_{VARIABLE_3_value:.3f}" # Create directory names using the parameter values
+    #            full_path = RES_PATH / dir_name # Combine the base directory with the current directory name
+    #            full_path.mkdir(parents=True, exist_ok=True)
 
-    visualisation.activate()
+    # Create a CUDAEnsemble to execute the RunPlanVector
+    ensemble = pyflamegpu.CUDAEnsemble(model)
+
+    # Override config defaults
+    ensemble.Config().out_directory = RES_PATH.as_posix()
+    ensemble.Config().out_format = "json"
+    ensemble.Config().concurrent_runs = 1  # This is concurrent runs per device, higher values may improve performance for "small" models
+    ensemble.Config().timing = False
+    ensemble.Config().error_level = pyflamegpu.CUDAEnsembleConfig.Fast  # Kills the ensemble as soon as the first error is detected
+
+    # Pass any logging configs to the CUDAEnsemble
+    # https://docs.flamegpu.com/guide/running-multiple-simulations/index.html#creating-a-logging-configuration
+    ensemble.setStepLog(step_log)
+    ensemble.setExitLog(logging_config)
+
+else:
+    simulation = pyflamegpu.CUDASimulation(model)
+    simulation.SimulationConfig().steps = STEPS
+    simulation.setStepLog(step_log)
+    simulation.setExitLog(logging_config)
+
+[PLACEHOLDER_VISUALIZATION_1]
+
 
 """
   Execution
 """
 if ENSEMBLE:
     # Execute the ensemble using the specified RunPlans
-    errs = ensemble.simulate(runs_final)
+    errs = ensemble.simulate(ensemble_runs)
 else:
     simulation.simulate()
 
-"""
-  Export Pop
-"""
-# simulation.exportData("end.xml")
 
-# Join Visualisation
-if pyflamegpu.VISUALISATION and VISUALISATION and not ENSEMBLE:
-    visualisation.join()
+[PLACEHOLDER_VISUALIZATION_2]
 
-print("--- EXECUTION TIME: %s seconds ---" % (time.time() - start_time))
 
 
 def manageLogs(steps, is_ensemble, idx):
-    global SAVE_EVERY_N_STEPS, SAVE_PICKLE, SHOW_PLOTS, RES_PATH, model_config
-    global BPOS_OVER_TIME, BFORCE_OVER_TIME, BFORCE_SHEAR_OVER_TIME, OSCILLATORY_STRAIN_OVER_TIME
-    ecm_agent_counts = [None] * len(steps)
     counter = 0
-    BFORCE = make_dataclass("BFORCE",
-                            [("fxpos", float), ("fxneg", float), ("fypos", float), ("fyneg", float), ("fzpos", float),
-                             ("fzneg", float)])
-    BFORCE_SHEAR = make_dataclass("BFORCE_SHEAR",
-                                  [("fxpos_y", float), ("fxpos_z", float), ("fxneg_y", float), ("fxneg_z", float),
-                                   ("fypos_x", float), ("fypos_z", float), ("fyneg_x", float), ("fyneg_z", float),
-                                   ("fzpos_x", float), ("fzpos_y", float), ("fzneg_x", float), ("fzneg_y", float)])
     for step in steps:
         stepcount = step.getStepCount()
         if stepcount % SAVE_EVERY_N_STEPS == 0 or stepcount == 1:
-            ecm_agents = step.getAgent("FNODE")
-            ecm_agent_counts[counter] = ecm_agents.getCount()
-            f_bx_pos = ecm_agents.getSumFloat("f_bx_pos")
-            f_bx_neg = ecm_agents.getSumFloat("f_bx_neg")
-            f_by_pos = ecm_agents.getSumFloat("f_by_pos")
-            f_by_neg = ecm_agents.getSumFloat("f_by_neg")
-            f_bz_pos = ecm_agents.getSumFloat("f_bz_pos")
-            f_bz_neg = ecm_agents.getSumFloat("f_bz_neg")
-            f_bx_pos_y = ecm_agents.getSumFloat("f_bx_pos_y")
-            f_bx_pos_z = ecm_agents.getSumFloat("f_bx_pos_z")
-            f_bx_neg_y = ecm_agents.getSumFloat("f_bx_neg_y")
-            f_bx_neg_z = ecm_agents.getSumFloat("f_bx_neg_z")
-            f_by_pos_x = ecm_agents.getSumFloat("f_by_pos_x")
-            f_by_pos_z = ecm_agents.getSumFloat("f_by_pos_z")
-            f_by_neg_x = ecm_agents.getSumFloat("f_by_neg_x")
-            f_by_neg_z = ecm_agents.getSumFloat("f_by_neg_z")
-            f_bz_pos_x = ecm_agents.getSumFloat("f_bz_pos_x")
-            f_bz_pos_y = ecm_agents.getSumFloat("f_bz_pos_y")
-            f_bz_neg_x = ecm_agents.getSumFloat("f_bz_neg_x")
-            f_bz_neg_y = ecm_agents.getSumFloat("f_bz_neg_y")
-
-            step_bforce = pd.DataFrame([BFORCE(f_bx_pos, f_bx_neg, f_by_pos, f_by_neg, f_bz_pos, f_bz_neg)])
-            step_bforce_shear = pd.DataFrame([BFORCE_SHEAR(f_bx_pos_y, f_bx_pos_z, f_bx_neg_y, f_bx_neg_z,
-                                                           f_by_pos_x, f_by_pos_z, f_by_neg_x, f_by_neg_z,
-                                                           f_bz_pos_x, f_bz_pos_y, f_bz_neg_x, f_bz_neg_y)])
-            if counter == 0:
-                BFORCE_OVER_TIME = pd.DataFrame([BFORCE(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)])
-                BFORCE_SHEAR_OVER_TIME = pd.DataFrame(
-                    [BFORCE_SHEAR(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)])
-            else:
-                # BFORCE_OVER_TIME = BFORCE_OVER_TIME.append(step_bforce, ignore_index=True) # deprecated
-                BFORCE_OVER_TIME = pd.concat([BFORCE_OVER_TIME, step_bforce], ignore_index=True)
-                # BFORCE_SHEAR_OVER_TIME = BFORCE_SHEAR_OVER_TIME.append(step_bforce_shear, ignore_index=True) # deprecated
-                BFORCE_SHEAR_OVER_TIME = pd.concat([BFORCE_SHEAR_OVER_TIME, step_bforce_shear], ignore_index=True)
-            counter += 1
-    if not is_ensemble:
-        print()
-        print("============================")
-        print("BOUNDARY POSITIONS OVER TIME")
-        print(BPOS_OVER_TIME)
-        print()
-        print("============================")
-        print("BOUNDARY FORCES OVER TIME")
-        print(BFORCE_OVER_TIME)
-        print()
-        print("============================")
-        print("BOUNDARY SHEAR FORCES OVER TIME")
-        print(BFORCE_SHEAR_OVER_TIME)
-        print()
-        print("============================")
-        print("STRAIN OVER TIME")
-        print(OSCILLATORY_STRAIN_OVER_TIME)
-        print()
-    # Saving pickle
-    # if SAVE_PICKLE:
-        # import pickle
-
-        # file_name = f'output_data_{idx}.pickle'
-        # file_path = RES_PATH / file_name
-        # with open(str(file_path), 'wb') as file:
-            # pickle.dump({'BPOS_OVER_TIME': BPOS_OVER_TIME,
-                         # 'BFORCE_OVER_TIME': BFORCE_OVER_TIME,
-                         # 'BFORCE_SHEAR_OVER_TIME': BFORCE_SHEAR_OVER_TIME,
-                         # 'OSCILLATORY_STRAIN_OVER_TIME': OSCILLATORY_STRAIN_OVER_TIME,
-                         # 'model_config': model_config},
-                        # file, protocol=pickle.HIGHEST_PROTOCOL)
-
-            # print('Results successfully saved to {0}'.format(file_path))
-    # Plotting
-    # if SHOW_PLOTS and not is_ensemble:
-        # # fig,ax=plt.subplots(2,3)
-        # fig = plt.figure()
-        # gs = fig.add_gridspec(2, 3)
-        # ax1 = fig.add_subplot(gs[0, 0])
-        # ax2 = fig.add_subplot(gs[0, 1])
-        # ax3 = fig.add_subplot(gs[:, 2])
-        # ax4 = fig.add_subplot(gs[1, 0])
-        # ax5 = fig.add_subplot(gs[1, 1])
-        # # BPOS_OVER_TIME.plot()
-
-        # BPOS_OVER_TIME.plot(ax=ax1)
-        # # ax = df['size'].plot(secondary_y=True, color='k', marker='o')
-        # ax1.set_xlabel('time step')
-        # ax1.set_ylabel('pos')
-        # BFORCE_OVER_TIME.plot(ax=ax2)
-        # ax2.set_ylabel('normal force')
-        # ax2.set_xlabel('time step')
-        # BFORCE_SHEAR_OVER_TIME.plot(ax=ax3)
-        # ax3.set_ylabel('shear force')
-        # ax3.set_xlabel('time step')
-        # POISSON_RATIO_OVER_TIME.plot(ax=ax4)
-        # ax4.set_ylabel('poisson ratio')
-        # ax4.set_xlabel('time step')
-        # plt.sca(ax5)
-        # plt.plot(BPOS_OVER_TIME['ypos'] - 0.5, BFORCE_OVER_TIME['fypos'])
-        # ax5.set_ylabel('normal force')
-        # ax5.set_xlabel('disp')
-
-        # fig.tight_layout()
-
-        # if OSCILLATORY_SHEAR_ASSAY:
-            # OSCILLATORY_STRAIN_OVER_TIME.plot()
-            # fig2 = plt.figure()
-            # colors = np.arange(0, STEPS + 1, 1).tolist()
-            # plt.scatter(OSCILLATORY_STRAIN_OVER_TIME['strain'].abs(), BFORCE_SHEAR_OVER_TIME['fypos_x'].abs(),
-                        # marker='o', c=colors, alpha=0.3, cmap='viridis')
-            # plt.xlabel('strain')
-            # plt.ylabel('shear force')
-            # fig3 = plt.figure()
-            # colors = np.arange(0, STEPS + 1, 1).tolist()
-            # plt.scatter(OSCILLATORY_STRAIN_OVER_TIME['strain'].abs(), BFORCE_SHEAR_OVER_TIME['fypos_x'], marker='o',
-                        # c=colors, alpha=0.3, cmap='viridis')
-            # plt.xlabel('strain')
-            # plt.ylabel('shear force')
-
-            # fig4, ax41 = plt.subplots()
-            # x = colors
-            # ax42 = ax41.twinx()
-            # ax41.plot(x, OSCILLATORY_STRAIN_OVER_TIME['strain'], 'g-')
-            # ax42.plot(x, BFORCE_SHEAR_OVER_TIME['fypos_x'], 'b-')
-
-            # ax41.set_xlabel('steps')
-            # ax41.set_ylabel('strain', color='g')
-            # ax42.set_ylabel('shear force', color='b')
-            # ax42.set_ylim(-35, 35)
-
-        # plt.show()
-
+            [PLACEHOLDER_AGENT_LOGS]
+            
 
 # Deal with logs
 if ENSEMBLE:
