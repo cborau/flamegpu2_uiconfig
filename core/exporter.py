@@ -30,6 +30,14 @@ _ENV_PROPERTY_METHODS: dict[str, str] = {
     "ArrayUInt": "newPropertyArrayUInt",
 }
 
+_MACRO_PROPERTY_METHODS: dict[str, str] = {
+    "Float": "newMacroPropertyFloat",
+    "ArrayFloat": "newMacroPropertyFloat",
+    "Int": "newMacroPropertyInt",
+    "UInt8": "newMacroPropertyInt",
+    "ArrayUInt": "newMacroPropertyInt",
+}
+
 _AGENT_VARIABLE_METHODS: dict[str, str] = {
     "Float": "newVariableFloat",
     "Int": "newVariableInt",
@@ -127,7 +135,10 @@ def _render_model_globals(globals_: Sequence[GlobalVariable]) -> str:
 
     lines: list[str] = []
     for glob in globals_:
-        method = _ENV_PROPERTY_METHODS.get(glob.var_type, _ENV_PROPERTY_METHODS[DEFAULT_VAR_TYPE])
+        if getattr(glob, "is_macro", False):
+            method = _MACRO_PROPERTY_METHODS.get(glob.var_type, "newMacroPropertyFloat")
+        else:
+            method = _ENV_PROPERTY_METHODS.get(glob.var_type, _ENV_PROPERTY_METHODS[DEFAULT_VAR_TYPE])
         literal = _format_literal(glob.var_type, glob.value)
         lines.append(f'env.{method}("{glob.name}", {literal})')
     return "\n".join(lines)
