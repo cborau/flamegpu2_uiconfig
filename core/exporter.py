@@ -136,14 +136,16 @@ def _render_model_globals(globals_: Sequence[GlobalVariable]) -> str:
 def _render_function_files(agents: Sequence[AgentType]) -> str:
     blocks: list[str] = []
     for agent in agents:
+        if not agent.functions:
+            continue
+        block_lines = [
+            "\"\"\"",
+            f"  {agent.name}",
+            "\"\"\"",
+        ]
         for func in agent.functions:
-            block_lines = [
-                "\"\"\"",
-                f"  {agent.name}",
-                "\"\"\"",
-                f'{func.name}_file = "{func.name}.cpp"',
-            ]
-            blocks.append("\n".join(block_lines))
+            block_lines.append(f'{func.name}_file = "{func.name}.cpp"')
+        blocks.append("\n".join(block_lines))
     return "\n\n".join(blocks) if blocks else "# No agent function files declared"
 
 
