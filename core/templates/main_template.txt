@@ -19,7 +19,7 @@ STEPS = ?
 TIME_STEP = ?
 EPSILON = 0.0000000001
 MAX_EXPECTED_BOUNDARY_POS = ?
-MIN_EXPECTED_BOUNDARY_POS = -?
+MIN_EXPECTED_BOUNDARY_POS = ?
 MAX_SEARCH_RADIUS_[PLACEHOLDER-AGENT_i_NAME] = ?
 SAVE_EVERY_N_STEPS = ?
 SAVE_DATA_TO_FILE = False
@@ -128,10 +128,7 @@ class SaveDataToFile(pyflamegpu.HostFunction):
         if SAVE_DATA_TO_FILE:
             if stepCounter % SAVE_EVERY_N_STEPS == 0 or stepCounter == 1:
                 # TODO: code to save data function
-                
-
-
-            
+                          
 
 sdf = SaveDataToFile()
 model.addStepFunction(sdf)
@@ -188,7 +185,7 @@ if ENSEMBLE:
     # Create the first dimension of the parameter sweep
     ensemble_runs = pyflamegpu.RunPlanVector(model, 0)
 	# Example: varying 3 model variables to check model sensitivity
-    for VARIABLE_1_value in np.linspace(?, ?, ?): # min, max, number of divisions
+    #for VARIABLE_1_value in np.linspace(?, ?, ?): # min, max, number of divisions
     #    for VARIABLE_2_value in np.linspace(?, ?, ?):
     #        for VARIABLE_3_value in np.linspace(?, ?, ?):
     #            run_control.setPropertyFloat("VARIABLE_1", VARIABLE_1_value)

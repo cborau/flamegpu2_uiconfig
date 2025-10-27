@@ -147,7 +147,8 @@ class MainWindow(QMainWindow):
                 agents=agents,
                 layers=layers,
                 globals_=globals_,
-                connections=connections
+                connections=connections,
+                visualization=visualization,
             )
         except Exception as exc:
             QMessageBox.critical(self, "Export Failed", f"Could not export model files:\n{exc}")

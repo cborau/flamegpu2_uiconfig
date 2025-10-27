@@ -212,3 +212,4 @@ model_files/example3.py
 configs/example3.json
 .vscode/settings.json
 core/templates/InstructionCo2.txt
+model_files/example2.py
