@@ -1,6 +1,6 @@
 # FLAME GPU 2 Visual Configurator
 
-A desktop tool for assembling FLAME GPU 2 model configurations without hand-editing JSON. Define agents, globals, layers, logging, and visualization settings through a Qt UI and export ready-to-edit Python scaffolding.
+A desktop tool for assembling FLAME GPU 2 model configurations to minimize hand-editing. Define agents, globals, layers, logging, and visualization settings through a Qt UI and export ready-to-edit Python and C++ files.
 
 [IMAGE HERE: APPLICATION OVERVIEW]
 
@@ -17,11 +17,10 @@ A desktop tool for assembling FLAME GPU 2 model configurations without hand-edit
 
 - Python 3.10+ (tested with Anaconda environments).
 - Recommended: a virtual environment (conda or venv).
-- Required packages (see `requirements.txt` if available or install manually):
-  - `PySide6`
-  - `numpy`
-  - `pyqtgraph` (if canvas helpers rely on it)
-  - `pyflamegpu` (for exported templates)
+- Required packages (see `requirements.txt` or install manually):
+   - `PySide6`
+
+> _Optional_: Install `pyflamegpu` to execute the generated model scaffolding, but it is **not** required to run the configurator UI.
 
 > _Tip_: If you created a dedicated environment for FLAME GPU, activate it before running the configurator.
 
