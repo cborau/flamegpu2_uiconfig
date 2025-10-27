@@ -27,7 +27,6 @@ BOUNDARY_COORDS = [?, ?, ?, ?, ?, ?] # +X,-X,+Y,-Y,+Z,-Z
 VISUALISATION = ?
 DEBUG_PRINTING = False
 ENSEMBLE = False # set to True of parallel exeqution
-ENSEMBLE_RUNS = 0
 CURR_PATH = pathlib.Path().absolute()
 RES_PATH = CURR_PATH / 'result_files'
 RES_PATH.mkdir(parents=True, exist_ok=True)
@@ -160,14 +159,6 @@ step_log.setFrequency(1) # if 1, data will be logged every step
   Create Model Runner
 """
 if ENSEMBLE:
-    """
-    Create Run Plan Vector
-    """
-    run_plan_vector = pyflamegpu.RunPlanVector(model, ENSEMBLE_RUNS)
-    run_plan_vector.setSteps(env.getPropertyUInt("STEPS"))
-    simulation_seed = random.randint(0, 99999)
-    run_plan_vector.setRandomSimulationSeed(simulation_seed, 1000)
-    simulation = pyflamegpu.CUDAEnsemble(model)
 
     """
     Create Control Run Plan
