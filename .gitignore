@@ -213,3 +213,4 @@ configs/example3.json
 .vscode/settings.json
 core/templates/InstructionCo2.txt
 model_files/example2.py
+ui/assets/icon.ai

@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QFileDialog, QMessageBox
 )
 from PySide6.QtCore import Qt, QUrl
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtGui import QDesktopServices, QIcon
 from pathlib import Path
 from ui.tabs.agent_config_tab import AgentConfigTab
 from ui.tabs.globals_tab import GlobalsTab
@@ -21,6 +21,8 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("ABM Configurator")
         self.resize(1400, 800)
+        icon_path = Path(__file__).resolve().parent / "assets" / "icon.png"
+        self.setWindowIcon(QIcon(str(icon_path)))
 
         splitter = QSplitter(Qt.Horizontal)
 
