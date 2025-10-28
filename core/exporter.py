@@ -185,14 +185,6 @@ def _render_messages(agents: Sequence[AgentType]) -> tuple[str, set[str]]:
                     f"{var_name} = model.newMessageBucket(\"{agent.name}_bucket_location_message\")",
                     "# Set the range and bounds.",
                     f"{var_name}.setBounds(0,{agent.name}_N_NODES)",
-                    f'{var_name}.newVariableInt("id")',
-                    f'{var_name}.newVariableFloat("x")',
-                    f'{var_name}.newVariableFloat("y")',
-                    f'{var_name}.newVariableFloat("z")',
-                    f'{var_name}.newVariableFloat("vx")',
-                    f'{var_name}.newVariableFloat("vy")',
-                    f'{var_name}.newVariableFloat("vz")',
-                    f'{var_name}.newVariableArrayUInt("linked_nodes", {agent.name}_MAX_CONNECTIVITY)',
                 ]
             else:
                 block_lines = [
@@ -204,25 +196,61 @@ def _render_messages(agents: Sequence[AgentType]) -> tuple[str, set[str]]:
                     f"{var_name}.setRadius(MAX_SEARCH_RADIUS_{agent.name})",
                     f"{var_name}.setMin(MIN_EXPECTED_BOUNDARY_POS, MIN_EXPECTED_BOUNDARY_POS, MIN_EXPECTED_BOUNDARY_POS)",
                     f"{var_name}.setMax(MAX_EXPECTED_BOUNDARY_POS, MAX_EXPECTED_BOUNDARY_POS, MAX_EXPECTED_BOUNDARY_POS)",
-                    f'{var_name}.newVariableInt("id")',
-                    "# TODO: add manually the rest of agent variables that need to be reported, execpt x, y, z which are automatically included in MessageSpatial3D messages",
                 ])
             elif msg_type == "MessageArray3D":
                 block_lines.extend([
                     f"{agent.name}_AGENTS_PER_DIR = [?, ?, ?]",
                     f"{var_name}.setDimensions({agent.name}_AGENTS_PER_DIR[0], {agent.name}_AGENTS_PER_DIR[1], {agent.name}_AGENTS_PER_DIR[2])",
-                    f'{var_name}.newVariableInt("id")',
-                    f'{var_name}.newVariableFloat("x")',
-                    f'{var_name}.newVariableFloat("y")',
-                    f'{var_name}.newVariableFloat("z")',
-                    f'{var_name}.newVariableFloat("vx")',
-                    f'{var_name}.newVariableFloat("vy")',
-                    f'{var_name}.newVariableFloat("vz")',
-                    "# TODO: add manually the rest of agent variables that need to be reported",
                 ])
+
+            _append_agent_variables_to_message(block_lines, var_name, agent, msg_type)
+
+            if msg_type == "MessageBucket":
+                block_lines.append(
+                    f'{var_name}.newVariableArrayUInt("linked_nodes", {agent.name}_MAX_CONNECTIVITY)'
+                )
+
+            block_lines.append(
+                "# TODO: add or remove variables manually to leave only those that need to be reported. If message type is MessageSpatial3D, variables x, y, z are included internally."
+            )
+
             blocks.append("\n".join(block_lines))
     return ("\n\n".join(blocks) if blocks else "# No location messages defined"), spatial_agents
 
+
+def _append_agent_variables_to_message(
+    block_lines: list[str],
+    message_var_name: str,
+    agent: AgentType,
+    msg_type: str,
+) -> None:
+    handled: set[str] = set()
+
+    def add_variable(name: str, var_type: str, default: str | None) -> None:
+        if not name or name in handled:
+            return
+        method = _AGENT_VARIABLE_METHODS.get(var_type, _AGENT_VARIABLE_METHODS[DEFAULT_VAR_TYPE])
+        if var_type in _ARRAY_TYPES:
+            caster = float if var_type == "ArrayFloat" else int
+            values = _parse_array(default, caster)
+            length_literal = str(len(values)) if values else "?"
+            block_lines.append(f'{message_var_name}.{method}("{name}", {length_literal})')
+        else:
+            block_lines.append(f'{message_var_name}.{method}("{name}")')
+        handled.add(name)
+
+    add_variable("id", "Int", None)
+
+    if msg_type == "MessageBucket":
+        handled.add("linked_nodes")
+
+    skip_for_spatial = {"x", "y", "z"} if msg_type == "MessageSpatial3D" else set()
+    for var in getattr(agent, "variables", []):
+        var_name = getattr(var, "name", "")
+        if not var_name or var_name in skip_for_spatial:
+            continue
+        var_type = getattr(var, "var_type", DEFAULT_VAR_TYPE) or DEFAULT_VAR_TYPE
+        add_variable(var_name, var_type, getattr(var, "default", None))
 
 def _render_agents(agents: Sequence[AgentType], connections: Sequence[dict]) -> str:
     if not agents:
