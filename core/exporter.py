@@ -506,10 +506,16 @@ def _format_literal(var_type: str | None, raw_value: str | None) -> str:
     var_type = var_type or DEFAULT_VAR_TYPE
     raw = (raw_value or "").strip()
     if var_type == SHAPE_VAR_TYPE:
-        dims = _parse_array(raw, float)
+        dims = _parse_shape_tokens(raw)
         if not dims:
             return "?"
-        return ", ".join(_format_shape_dimension(value) for value in dims)
+        formatted: list[str] = []
+        for token in dims:
+            if isinstance(token, str):
+                formatted.append(token)
+            else:
+                formatted.append(_format_shape_dimension(token))
+        return ", ".join(formatted)
     if var_type in _ARRAY_TYPES:
         items = _parse_array(raw, float if var_type == "ArrayFloat" else int)
         return "[" + ", ".join(_format_number(item) for item in items) + "]"
@@ -568,6 +574,29 @@ def _format_shape_dimension(value: float | int) -> str:
     if abs(value - rounded) < 1e-9:
         return str(int(rounded))
     return _format_number(value)
+
+
+def _parse_shape_tokens(raw: str | None) -> list:
+    if not raw:
+        return []
+    value = raw.strip()
+    if value.startswith("[") and value.endswith("]"):
+        value = value[1:-1]
+    if not value:
+        return []
+    tokens: list = []
+    for part in value.split(","):
+        piece = part.strip()
+        if not piece:
+            continue
+        if piece == "?":
+            tokens.append("?")
+            continue
+        try:
+            tokens.append(float(piece))
+        except ValueError:
+            tokens.append(piece)
+    return tokens
 
 
 def _build_input_map(connections: Sequence[dict]) -> dict[str, dict[str, str]]:

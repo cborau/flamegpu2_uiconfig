@@ -18,7 +18,8 @@ class GlobalsTab(QWidget):
         if value_header:
             value_header.setToolTip(
                 "Specify array values separated by commas. If variable is a MacroProperty, "
-                "specify shape (separated by commas) instead of values. Macro Properties are intialized programatically."
+                "specify shape (separated by commas) instead of values. Macro Properties are initialized programatically,"
+                "so you can use ? to denote undefined dimensions (e.g. '10,?,5')"
             )
         layout.addWidget(self.globals_table)
 
