@@ -216,3 +216,6 @@ model_files/example2.py
 ui/assets/icon.ai
 configs/example4.json
 model_files/example4.py
+configs/example5.json
+model_files/example5/
+core/templates/InstructionsCo3.txt

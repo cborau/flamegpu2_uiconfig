@@ -28,6 +28,7 @@ _ENV_PROPERTY_METHODS: dict[str, str] = {
     "Int": "newPropertyInt",
     "UInt8": "newPropertyUInt",
     "ArrayFloat": "newPropertyArrayFloat",
+    "ArrayInt": "newPropertyArrayInt",
     "ArrayUInt": "newPropertyArrayUInt",
 }
 
@@ -36,6 +37,7 @@ _MACRO_PROPERTY_METHODS: dict[str, str] = {
     "ArrayFloat": "newMacroPropertyFloat",
     "Int": "newMacroPropertyInt",
     "UInt8": "newMacroPropertyInt",
+    "ArrayInt": "newMacroPropertyInt",
     "ArrayUInt": "newMacroPropertyInt",
 }
 
@@ -44,6 +46,7 @@ _MACRO_PROPERTY_ACCESSORS: dict[str, str] = {
     "ArrayFloat": "getMacroPropertyFloat",
     "Int": "getMacroPropertyInt",
     "UInt8": "getMacroPropertyInt",
+    "ArrayInt": "getMacroPropertyInt",
     "ArrayUInt": "getMacroPropertyInt",
     SHAPE_VAR_TYPE: "getMacroPropertyFloat",
 }
@@ -53,6 +56,7 @@ _AGENT_VARIABLE_METHODS: dict[str, str] = {
     "Int": "newVariableInt",
     "UInt8": "newVariableUInt8",
     "ArrayFloat": "newVariableArrayFloat",
+    "ArrayInt": "newVariableArrayInt",
     "ArrayUInt": "newVariableArrayUInt",
 }
 
@@ -73,6 +77,8 @@ _LOGGING_METHODS = {
 }
 
 _INTERPOLATED_MODE = "Interpolated"
+
+_TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 
 
 def export_model_files(
@@ -124,8 +130,12 @@ def export_model_files(
 
     template = template.replace("[PLACEHOLDER_MAX_SEARCH_RADIUS_AGENT_i_NAME]", constants_block)
 
-    output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = output_dir / f"{model_name}.py"
+    export_root = output_dir / model_name
+    export_root.mkdir(parents=True, exist_ok=True)
+
+    _generate_function_files(export_root, agents, connections or [])
+
+    output_path = export_root / f"{model_name}.py"
     output_path.write_text(template, encoding="utf-8")
     return output_path
 
@@ -185,6 +195,256 @@ def _render_macro_initialisation(globals_: Sequence[GlobalVariable]) -> str:
 def _macro_accessor_for(var_type: str | None) -> str:
     key = var_type or DEFAULT_VAR_TYPE
     return _MACRO_PROPERTY_ACCESSORS.get(key, "getMacroPropertyFloat")
+
+
+def _generate_function_files(export_root: Path, agents: Sequence[AgentType], connections: Sequence[dict]) -> None:
+    agent_lookup = {agent.name: agent for agent in agents}
+    input_map = _build_input_map(connections)
+
+    for agent in agents:
+        for func in getattr(agent, "functions", []):
+            template_path = _select_function_template(getattr(func, "output_type", "MessageNone"))
+            if not template_path or not template_path.exists():
+                continue
+            template_content = template_path.read_text(encoding="utf-8")
+            source_agent_name = _input_source_agent(
+                agent.name,
+                getattr(func, "name", ""),
+                getattr(func, "input_type", "MessageNone"),
+                input_map,
+            )
+            source_agent = agent_lookup.get(source_agent_name) if source_agent_name else None
+            rendered = _render_function_template(
+                template_content,
+                agent,
+                func,
+                source_agent,
+            )
+            output_path = export_root / f"{func.name}.cpp"
+            output_path.write_text(rendered, encoding="utf-8")
+
+
+def _select_function_template(output_type: str) -> Path:
+    if output_type and output_type != "MessageNone":
+        return _TEMPLATES_DIR / "func_location_template.txt"
+    return _TEMPLATES_DIR / "func_any_template.txt"
+
+
+def _render_function_template(template: str, agent: AgentType, func, source_agent: AgentType | None) -> str:
+    replacements: dict[str, str] = {
+        "[PLACEHOLDER_FUNCTION_NAME]": func.name,
+        "[PLACEHOLDER_INPUT_MESSAGE]": getattr(func, "input_type", "MessageNone"),
+        "[PLACEHOLDER_OUTPUT_MESSAGE]": getattr(func, "output_type", "MessageNone"),
+        "[PLACEHOLDER_GET_AGENT_VARS]": _render_agent_variable_getters(agent),
+        "[PLACEHOLDER_SET_AGENT_VARS]": _render_agent_variable_setters(agent),
+        "[PLACE_HODER_MESSAGE_OUTPUT]": _render_message_output(agent, getattr(func, "output_type", "MessageNone")),
+        "[PLACEHOLDER_GET_MESSAGE_VARS]": _render_message_variable_getters(
+            source_agent,
+            getattr(func, "input_type", "MessageNone"),
+        ),
+    }
+
+    for placeholder, value in replacements.items():
+        template = template.replace(placeholder, value)
+    return template
+
+
+def _render_agent_variable_getters(agent: AgentType) -> str:
+    lines: list[str] = []
+    for var in getattr(agent, "variables", []):
+        var_name = getattr(var, "name", "")
+        if not var_name:
+            continue
+        var_type = getattr(var, "var_type", DEFAULT_VAR_TYPE) or DEFAULT_VAR_TYPE
+        cpp_type = _cpp_type_for(var_type)
+        if var_type in _ARRAY_TYPES:
+            element_type = _array_element_type(var_type)
+            lines.extend(_array_getter_block(var_name, element_type))
+        else:
+            lines.append(f"{cpp_type} agent_{var_name} = FLAMEGPU->getVariable<{cpp_type}>(\"{var_name}\");")
+    return _indent_lines(lines)
+
+
+def _render_agent_variable_setters(agent: AgentType) -> str:
+    lines: list[str] = []
+    for var in getattr(agent, "variables", []):
+        var_name = getattr(var, "name", "")
+        if not var_name:
+            continue
+        var_type = getattr(var, "var_type", DEFAULT_VAR_TYPE) or DEFAULT_VAR_TYPE
+        cpp_type = _cpp_type_for(var_type)
+        if var_type in _ARRAY_TYPES:
+            element_type = _array_element_type(var_type)
+            lines.extend(_array_setter_block(var_name, element_type))
+        else:
+            lines.append(f'FLAMEGPU->setVariable<{cpp_type}>("{var_name}", agent_{var_name});')
+    return _indent_lines(lines)
+
+
+def _render_message_output(agent: AgentType, output_type: str) -> str:
+    if output_type == "MessageNone":
+        return ""
+    lines: list[str] = []
+    for var in getattr(agent, "variables", []):
+        var_name = getattr(var, "name", "")
+        if not var_name:
+            continue
+        var_type = getattr(var, "var_type", DEFAULT_VAR_TYPE) or DEFAULT_VAR_TYPE
+        cpp_type = _cpp_type_for(var_type)
+        if var_type in _ARRAY_TYPES:
+            element_type = _array_element_type(var_type)
+            lines.append("// Agent array variables")
+            lines.append(
+                f"const uint8_t {var_name}_ARRAY_SIZE = ?; // WARNING: this variable must be hard coded to have the same value as the one defined in the main python function."
+            )
+            lines.append("")
+            lines.append(f"for (int i = 0; i < {var_name}_ARRAY_SIZE; i++) {{")
+            lines.append(
+                f"  {element_type} ncol = FLAMEGPU->getVariable<{element_type}, {var_name}_ARRAY_SIZE>(\"{var_name}\", i);"
+            )
+            lines.append(
+                f"  FLAMEGPU->message_out.setVariable<{element_type}, {var_name}_ARRAY_SIZE>(\"{var_name}\", i, ncol);"
+            )
+            lines.append("}")
+        else:
+            lines.append(
+                f'FLAMEGPU->message_out.setVariable<{cpp_type}>("{var_name}", FLAMEGPU->getVariable<{cpp_type}>("{var_name}"));'
+            )
+    return _indent_lines(lines)
+
+
+def _render_message_variable_getters(source_agent: AgentType | None, input_type: str) -> str:
+    if input_type == "MessageNone":
+        return ""
+
+    lines: list[str] = ["//Define message variables (agent sending the input message)"]
+    message_vars = list(getattr(source_agent, "variables", [])) if source_agent else []
+    has_connection = source_agent is not None
+
+    for var in message_vars:
+        var_name = getattr(var, "name", "")
+        if not var_name:
+            continue
+        var_type = getattr(var, "var_type", DEFAULT_VAR_TYPE) or DEFAULT_VAR_TYPE
+        cpp_type = _cpp_type_for(var_type)
+        if var_type in _ARRAY_TYPES:
+            element_type = _array_element_type(var_type)
+            lines.append(
+                f"const uint8_t message_{var_name}_ARRAY_SIZE = ?; // WARNING: this variable must be hard coded to have the same value as the one defined in the main python function."
+            )
+            lines.append(f"{element_type} message_{var_name}[message_{var_name}_ARRAY_SIZE] = {{}};")
+        else:
+            lines.append(f"{cpp_type} message_{var_name} = {_default_cpp_value(cpp_type)};")
+
+    if len(lines) == 1:
+        if not has_connection:
+            lines.append("// WARNING: this function is not currently wired to any message source")
+        lines.append("// TODO: initialise message variables as needed")
+
+    lines.append("")
+    lines.append("//Loop through all agents sending input messages")
+    lines.append(_message_iteration_header(input_type))
+
+    loop_body: list[str] = []
+    for var in message_vars:
+        var_name = getattr(var, "name", "")
+        if not var_name:
+            continue
+        var_type = getattr(var, "var_type", DEFAULT_VAR_TYPE) or DEFAULT_VAR_TYPE
+        cpp_type = _cpp_type_for(var_type)
+        if var_type in _ARRAY_TYPES:
+            element_type = _array_element_type(var_type)
+            loop_body.append(
+                f"  for (int i = 0; i < message_{var_name}_ARRAY_SIZE; i++) {{"
+            )
+            loop_body.append(
+                f"    message_{var_name}[i] = message.getVariable<{element_type}, message_{var_name}_ARRAY_SIZE>(\"{var_name}\", i);"
+            )
+            loop_body.append("  }")
+        else:
+            loop_body.append(
+                f"  message_{var_name} = message.getVariable<{cpp_type}>(\"{var_name}\");"
+            )
+
+    if not loop_body:
+        if not has_connection:
+            loop_body.append("  // WARNING: this function is not currently wired to any message source")
+        loop_body.append("  // TODO: process incoming message data")
+
+    lines.extend(loop_body)
+    lines.append("}")
+
+    return _indent_lines(lines)
+
+
+def _array_getter_block(name: str, element_type: str) -> list[str]:
+    return [
+        "// Agent array variables",
+        f"const uint8_t {name}_ARRAY_SIZE = ?; // WARNING: this variable must be hard coded to have the same value as the one defined in the main python function.",
+        f"{element_type} {name}[{name}_ARRAY_SIZE] = {{}};",
+        f"for (int i = 0; i < {name}_ARRAY_SIZE; i++) {{",
+        f"  {name}[i] = FLAMEGPU->getVariable<{element_type}, {name}_ARRAY_SIZE>(\"{name}\", i);",
+        "}",
+    ]
+
+
+def _array_setter_block(name: str, element_type: str) -> list[str]:
+    return [
+        "// Agent array variables",
+        f"const uint8_t {name}_ARRAY_SIZE = ?; // WARNING: this variable must be hard coded to have the same value as the one defined in the main python function.",
+        "",
+        f"for (int i = 0; i < {name}_ARRAY_SIZE; i++) {{",
+        f"  FLAMEGPU->setVariable<{element_type}, {name}_ARRAY_SIZE>(\"{name}\", i, {name}[i]);",
+        "}",
+    ]
+
+
+def _cpp_type_for(var_type: str | None) -> str:
+    mapping = {
+        "Float": "float",
+        "Int": "int",
+        "UInt8": "uint8_t",
+        "ArrayFloat": "float",
+        "ArrayUInt": "int",
+    }
+    key = var_type or DEFAULT_VAR_TYPE
+    return mapping.get(key, "float")
+
+
+def _array_element_type(var_type: str | None) -> str:
+    if var_type == "ArrayFloat":
+        return "float"
+    if var_type == "ArrayUInt":
+        return "int"
+    return "float"
+
+
+def _indent_lines(lines: Iterable[str], indent: str = "  ") -> str:
+    if not lines:
+        return ""
+    indented: list[str] = []
+    for line in lines:
+        if line:
+            indented.append(f"{indent}{line}")
+        else:
+            indented.append("")
+    return "\n".join(indented)
+
+
+def _default_cpp_value(cpp_type: str) -> str:
+    if cpp_type in {"float", "double"}:
+        return "0.0"
+    return "0"
+
+
+def _message_iteration_header(message_type: str) -> str:
+    if message_type == "MessageSpatial3D":
+        return "for (const auto &message : FLAMEGPU->message_in(agent_x, agent_y, agent_z)) {"
+    if message_type == "MessageArray3D":
+        return "for (const auto &message : FLAMEGPU->message_in(/* TODO: provide grid coordinates */)) {"
+    if message_type == "MessageBucket":
+        return "for (const auto &message : FLAMEGPU->message_in(/* TODO: provide bucket index */)) {"
+    return "for (const auto &message : FLAMEGPU->message_in()) {"
 
 
 def _render_function_files(agents: Sequence[AgentType]) -> str:

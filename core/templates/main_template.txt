@@ -45,7 +45,7 @@ AGENT Files
 [PLACEHOLDER_FUNCTION_FILES]
 
 
-model = pyflamegpu.ModelDescription([PLACEHOLDER_MODEL_NAME])
+model = pyflamegpu.ModelDescription("[PLACEHOLDER_MODEL_NAME]")
 
 """
   GLOBAL SETTINGS

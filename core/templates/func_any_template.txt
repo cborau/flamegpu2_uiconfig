@@ -1,0 +1,12 @@
+FLAMEGPU_AGENT_FUNCTION([PLACEHOLDER_FUNCTION_NAME], flamegpu::[PLACEHOLDER_INPUT_MESSAGE], flamegpu::[PLACEHOLDER_OUTPUT_MESSAGE]) {
+  //Get agent variables (agent calling the function)
+[PLACEHOLDER_GET_AGENT_VARS]
+
+[PLACEHOLDER_GET_MESSAGE_VARS]
+
+  //Set agent variables
+[PLACEHOLDER_SET_AGENT_VARS]
+
+
+  return flamegpu::ALIVE;
+}
