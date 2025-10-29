@@ -20,7 +20,7 @@ TIME_STEP = ?
 EPSILON = 0.0000000001
 MAX_EXPECTED_BOUNDARY_POS = ?
 MIN_EXPECTED_BOUNDARY_POS = ?
-MAX_SEARCH_RADIUS_[PLACEHOLDER-AGENT_i_NAME] = ?
+[PLACEHOLDER_MAX_SEARCH_RADIUS_AGENT_i_NAME]
 SAVE_EVERY_N_STEPS = ?
 SAVE_DATA_TO_FILE = False
 BOUNDARY_COORDS = [?, ?, ?, ?, ?, ?] # +X,-X,+Y,-Y,+Z,-Z
@@ -230,8 +230,8 @@ def manageLogs(steps, is_ensemble, idx):
     for step in steps:
         stepcount = step.getStepCount()
         if stepcount % SAVE_EVERY_N_STEPS == 0 or stepcount == 1:
-            [PLACEHOLDER_AGENT_LOGS]
-            
+[PLACEHOLDER_AGENT_LOGS]
+            # TODO: print/plot/save data as needed
 
 # Deal with logs
 if ENSEMBLE:

@@ -110,7 +110,7 @@ def export_model_files(
     for placeholder, value in replacements.items():
         template = template.replace(placeholder, value)
 
-    template = template.replace("MAX_SEARCH_RADIUS_[PLACEHOLDER-AGENT_i_NAME]", constants_block)
+    template = template.replace("[PLACEHOLDER_MAX_SEARCH_RADIUS_AGENT_i_NAME]", constants_block)
 
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / f"{model_name}.py"
