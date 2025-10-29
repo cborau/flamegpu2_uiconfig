@@ -39,6 +39,15 @@ _MACRO_PROPERTY_METHODS: dict[str, str] = {
     "ArrayUInt": "newMacroPropertyInt",
 }
 
+_MACRO_PROPERTY_ACCESSORS: dict[str, str] = {
+    "Float": "getMacroPropertyFloat",
+    "ArrayFloat": "getMacroPropertyFloat",
+    "Int": "getMacroPropertyInt",
+    "UInt8": "getMacroPropertyInt",
+    "ArrayUInt": "getMacroPropertyInt",
+    SHAPE_VAR_TYPE: "getMacroPropertyFloat",
+}
+
 _AGENT_VARIABLE_METHODS: dict[str, str] = {
     "Float": "newVariableFloat",
     "Int": "newVariableInt",
@@ -90,6 +99,7 @@ def export_model_files(
     logging_block = _render_logging(agents)
     visualization_block_1, visualization_block_2 = _render_visualisation_blocks(agents, visualization)
     agent_logs_block = _render_agent_logs(agents)
+    macro_init_block = _render_macro_initialisation(globals_)
 
     constants_block = _render_spatial_constants(spatial_agents)
 
@@ -106,6 +116,7 @@ def export_model_files(
         "[PLACEHOLDER_VISUALIZATION_1]": visualization_block_1,
         "[PLACEHOLDER_VISUALIZATION_2]": visualization_block_2,
         "[PLACEHOLDER_AGENT_LOGS]": agent_logs_block,
+        "[PLACEHOLDER_INIT_MACRO_PROPERTIES]": macro_init_block,
     }
 
     for placeholder, value in replacements.items():
@@ -143,6 +154,37 @@ def _render_model_globals(globals_: Sequence[GlobalVariable]) -> str:
         literal = _format_literal(glob.var_type, glob.value)
         lines.append(f'env.{method}("{glob.name}", {literal})')
     return "\n".join(lines)
+
+
+def _render_macro_initialisation(globals_: Sequence[GlobalVariable]) -> str:
+    macro_vars = [glob for glob in globals_ if getattr(glob, "is_macro", False)]
+    if not macro_vars:
+        return "# No macro properties initialisation required"
+
+    lines: list[str] = [
+        "# Initialize the MacroProperties",
+        "class initMacroProperties(pyflamegpu.HostFunction):",
+        "    def run(self, FLAMEGPU):",
+        "        # Get property handles and modify their values.  Replace getMacroPropertyFloat by getMacroPropertyInt if needed",
+    ]
+
+    for glob in macro_vars:
+        accessor = _macro_accessor_for(glob.var_type)
+        lines.append(f'        {glob.name} = FLAMEGPU.environment.{accessor}("{glob.name}")')
+
+    lines.append("        # TODO: initialize values. All 0 by default")
+    lines.append("")
+    lines.append("        return")
+    lines.append("")
+    lines.append("initialMacroProperties = initMacroProperties()")
+    lines.append("model.addInitFunction(initialMacroProperties)")
+
+    return "\n".join(lines)
+
+
+def _macro_accessor_for(var_type: str | None) -> str:
+    key = var_type or DEFAULT_VAR_TYPE
+    return _MACRO_PROPERTY_ACCESSORS.get(key, "getMacroPropertyFloat")
 
 
 def _render_function_files(agents: Sequence[AgentType]) -> str:

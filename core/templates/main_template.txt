@@ -107,6 +107,7 @@ class initAgentPopulations(pyflamegpu.HostFunction):
 # Add function callback to INIT functions for population generation
 initialAgentPopulation = initAgentPopulations()
 model.addInitFunction(initialAgentPopulation)
+[PLACEHOLDER_INIT_MACRO_PROPERTIES]
 
 """
   STEP FUNCTIONS
