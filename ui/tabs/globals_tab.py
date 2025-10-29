@@ -1,19 +1,25 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QTableWidget, QTableWidgetItem, QComboBox
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QHeaderView
-from core.models import GlobalVariable, VAR_TYPE_OPTIONS, DEFAULT_VAR_TYPE
+from core.models import GlobalVariable, DEFAULT_VAR_TYPE, GLOBAL_VAR_TYPE_OPTIONS
 
 class GlobalsTab(QWidget):
     def __init__(self):
         super().__init__()
         layout = QVBoxLayout(self)
 
-        layout.addWidget(QLabel("Global Variables (name, type, value):"))
+        layout.addWidget(QLabel("Global Variables (name, type, value | shape):"))
         self.globals_table = QTableWidget(0, 4)
-        self.globals_table.setHorizontalHeaderLabels(["Name", "Type", "Value", "MacroProperty"])
+        self.globals_table.setHorizontalHeaderLabels(["Name", "Type", "Value | Shape", "MacroProperty"])
         self.globals_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
         self.globals_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
         self.globals_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        value_header = self.globals_table.horizontalHeaderItem(2)
+        if value_header:
+            value_header.setToolTip(
+                "Specify array values separated by commas. If variable is a MacroProperty, "
+                "specify shape (separated by commas) instead of values. Macro Properties are intialized programatically."
+            )
         layout.addWidget(self.globals_table)
 
         self.add_btn = QPushButton("Add Variable")
@@ -61,8 +67,8 @@ class GlobalsTab(QWidget):
 
     def _make_type_combo(self, current: str | None = None):
         combo = QComboBox()
-        combo.addItems(VAR_TYPE_OPTIONS)
-        if current in VAR_TYPE_OPTIONS:
+        combo.addItems(GLOBAL_VAR_TYPE_OPTIONS)
+        if current in GLOBAL_VAR_TYPE_OPTIONS:
             combo.setCurrentText(current)
         else:
             combo.setCurrentText(DEFAULT_VAR_TYPE)

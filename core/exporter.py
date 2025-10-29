@@ -14,6 +14,7 @@ from core.models import (
     VISUALIZATION_COLOR_MODES,
     VISUALIZATION_SHAPES,
     DEFAULT_VAR_TYPE,
+    SHAPE_VAR_TYPE,
 )
 
 _MESSAGE_TYPE_KEYS: dict[str, str] = {
@@ -504,6 +505,11 @@ def _safe_numeric_literal(value, fallback: str = "?") -> str:
 def _format_literal(var_type: str | None, raw_value: str | None) -> str:
     var_type = var_type or DEFAULT_VAR_TYPE
     raw = (raw_value or "").strip()
+    if var_type == SHAPE_VAR_TYPE:
+        dims = _parse_array(raw, float)
+        if not dims:
+            return "?"
+        return ", ".join(_format_shape_dimension(value) for value in dims)
     if var_type in _ARRAY_TYPES:
         items = _parse_array(raw, float if var_type == "ArrayFloat" else int)
         return "[" + ", ".join(_format_number(item) for item in items) + "]"
@@ -553,6 +559,15 @@ def _format_number(value: float | int) -> str:
     if isinstance(value, int):
         return str(value)
     return repr(float(value))
+
+
+def _format_shape_dimension(value: float | int) -> str:
+    if isinstance(value, int):
+        return str(value)
+    rounded = round(value)
+    if abs(value - rounded) < 1e-9:
+        return str(int(rounded))
+    return _format_number(value)
 
 
 def _build_input_map(connections: Sequence[dict]) -> dict[str, dict[str, str]]:

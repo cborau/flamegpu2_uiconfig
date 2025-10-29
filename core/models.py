@@ -3,6 +3,8 @@ from typing import List, Optional
 
 VAR_TYPE_OPTIONS = ["UInt8", "Int", "Float", "ArrayUInt", "ArrayFloat"]
 DEFAULT_VAR_TYPE = "Float"
+SHAPE_VAR_TYPE = "Shape"
+GLOBAL_VAR_TYPE_OPTIONS = VAR_TYPE_OPTIONS + [SHAPE_VAR_TYPE]
 
 AGENT_LOGGING_OPTIONS = ["NoLog", "Mean", "Min", "Max", "Sum", "Std"]
 DEFAULT_LOGGING_OPTION = AGENT_LOGGING_OPTIONS[0]
