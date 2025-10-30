@@ -66,7 +66,7 @@ _MESSAGE_CONSTRUCTORS: dict[str, str] = {
     "MessageBucket": "newMessageBucket",
 }
 
-_ARRAY_TYPES = {"ArrayFloat", "ArrayUInt"}
+_ARRAY_TYPES = {"ArrayFloat", "ArrayUInt", "ArrayInt"}
 
 _LOGGING_METHODS = {
     "Mean": "logMean",
@@ -414,7 +414,7 @@ def _cpp_type_for(var_type: str | None) -> str:
 def _array_element_type(var_type: str | None) -> str:
     if var_type == "ArrayFloat":
         return "float"
-    if var_type == "ArrayUInt":
+    if var_type in {"ArrayUInt", "ArrayInt"}:
         return "int"
     return "float"
 
@@ -542,8 +542,6 @@ def _append_agent_variables_to_message(
             block_lines.append(f'{message_var_name}.{method}("{name}")')
         handled.add(name)
 
-    add_variable("id", "Int", None)
-
     if msg_type == "MessageBucket":
         handled.add("linked_nodes")
 
@@ -554,6 +552,7 @@ def _append_agent_variables_to_message(
             continue
         var_type = getattr(var, "var_type", DEFAULT_VAR_TYPE) or DEFAULT_VAR_TYPE
         add_variable(var_name, var_type, getattr(var, "default", None))
+
 
 def _render_agents(agents: Sequence[AgentType], connections: Sequence[dict]) -> str:
     if not agents:
@@ -567,11 +566,11 @@ def _render_agents(agents: Sequence[AgentType], connections: Sequence[dict]) -> 
             f"  {agent.name} agent",
             '"""',
             f'{agent.name}_agent = model.newAgent("{agent.name}")',
-            f'{agent.name}_agent.newVariableInt("id")',
         ]
 
         for var in agent.variables:
-            if var.name == "id":
+            var_name = getattr(var, "name", "")
+            if not var_name:
                 continue
             var_type = var.var_type or DEFAULT_VAR_TYPE
             method = _AGENT_VARIABLE_METHODS.get(var_type, _AGENT_VARIABLE_METHODS[DEFAULT_VAR_TYPE])
@@ -579,11 +578,11 @@ def _render_agents(agents: Sequence[AgentType], connections: Sequence[dict]) -> 
                 caster = float if var_type == "ArrayFloat" else int
                 array_values = _parse_array(var.default, caster)
                 array_length = len(array_values)
-                lines.append(f'{agent.name}_agent.{method}("{var.name}", {array_length})')
+                lines.append(f'{agent.name}_agent.{method}("{var_name}", {array_length})')
                 lines.append("# TODO: default array values must be explicitly defined when initializing agent populations")
             else:
                 literal = _format_literal(var_type, var.default)
-                lines.append(f'{agent.name}_agent.{method}("{var.name}", {literal})')
+                lines.append(f'{agent.name}_agent.{method}("{var_name}", {literal})')
 
         for func in agent.functions:
             base = f'{agent.name}_agent.newRTCFunctionFile("{func.name}", {func.name}_file)'

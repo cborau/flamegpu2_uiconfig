@@ -103,8 +103,17 @@ class AgentConfigTab(QWidget):
         self.save_btn.setText("Save Agent Type")
 
     def populate_default_variables(self):
-        for var in ["x", "y", "z", "vx", "vy", "vz"]:
-            self.add_variable_row(name=var, var_type=DEFAULT_VAR_TYPE, default="0.0", logging=DEFAULT_LOGGING_OPTION)
+        defaults = [
+            ("id", "Int", "0"),
+            ("x", DEFAULT_VAR_TYPE, "0.0"),
+            ("y", DEFAULT_VAR_TYPE, "0.0"),
+            ("z", DEFAULT_VAR_TYPE, "0.0"),
+            ("vx", DEFAULT_VAR_TYPE, "0.0"),
+            ("vy", DEFAULT_VAR_TYPE, "0.0"),
+            ("vz", DEFAULT_VAR_TYPE, "0.0"),
+        ]
+        for name, var_type, default in defaults:
+            self.add_variable_row(name=name, var_type=var_type, default=default, logging=DEFAULT_LOGGING_OPTION)
 
     def choose_color(self):
         color = QColorDialog.getColor()
