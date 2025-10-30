@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 from typing import Iterable, Sequence
+import shutil
 
 from core.models import (
     AgentType,
@@ -135,6 +136,10 @@ def export_model_files(
 
     _generate_function_files(export_root, agents, connections or [])
 
+    handy_functions_template = _TEMPLATES_DIR / "handy_device_functions_template.cpp"
+    if handy_functions_template.exists():
+        shutil.copy(handy_functions_template, export_root / handy_functions_template.name)
+
     output_path = export_root / f"{model_name}.py"
     output_path.write_text(template, encoding="utf-8")
     return output_path
@@ -231,6 +236,11 @@ def _select_function_template(output_type: str) -> Path:
 
 
 def _render_function_template(template: str, agent: AgentType, func, source_agent: AgentType | None) -> str:
+    description = (getattr(func, "description", "") or "").strip()
+    if description:
+        comment_lines = [f"// {line}" if line else "//" for line in description.splitlines()]
+        template = "\n".join(comment_lines) + "\n" + template
+
     replacements: dict[str, str] = {
         "[PLACEHOLDER_FUNCTION_NAME]": func.name,
         "[PLACEHOLDER_INPUT_MESSAGE]": getattr(func, "input_type", "MessageNone"),

@@ -306,6 +306,8 @@ class AgentConfigTab(QWidget):
             logging_value = logging_combo.currentText() if isinstance(logging_combo, QComboBox) else DEFAULT_LOGGING_OPTION
             variables.append(AgentVariable(var_item.text(), val_item.text() if val_item else "", var_type, logging_value))
         functions = []
+        new_function_names: set[str] = set()
+        duplicate_in_agent: str | None = None
         for row in range(self.funcs_table.rowCount()):
             fname_item = self.funcs_table.item(row, 0)
             fdesc_item = self.funcs_table.item(row, 1)
@@ -313,12 +315,41 @@ class AgentConfigTab(QWidget):
             out_combo = self.funcs_table.cellWidget(row, 3)
             if not fname_item:
                 continue
+            fname = fname_item.text()
+            if fname in new_function_names:
+                duplicate_in_agent = fname
+                break
+            new_function_names.add(fname)
             functions.append(AgentFunction(
-                fname_item.text(),
+                fname,
                 fdesc_item.text() if fdesc_item else "",
                 in_combo.currentText() if in_combo else "MessageNone",
                 out_combo.currentText() if out_combo else "MessageNone"
             ))
+
+        if duplicate_in_agent:
+            QMessageBox.warning(
+                self,
+                "Duplicate Function Name",
+                f"Function '{duplicate_in_agent}' is already defined for this agent. Use unique names, for example prefix the agent name like 'agent_function1'.",
+            )
+            return
+
+        existing_function_names: set[str] = set()
+        for agent_name, agent_template in self.agent_templates.items():
+            if self.edit_mode and self.editing_original_name and agent_name == self.editing_original_name:
+                continue
+            for func in getattr(agent_template, "functions", []):
+                existing_function_names.add(func.name)
+
+        conflicting_name = next((name for name in new_function_names if name in existing_function_names), None)
+        if conflicting_name:
+            QMessageBox.warning(
+                self,
+                "Function Name Already Exists",
+                f"Function '{conflicting_name}' already exists for another agent. Please choose a unique name, e.g. prefix the agent name like 'agent_function1'.",
+            )
+            return
 
         # Default color if none picked: cycle through palette
         if self.selected_color is None:

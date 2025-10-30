@@ -379,15 +379,13 @@
     {
       "name": "Fiber repulsion",
       "function_ids": [
-        "fnode::fnode_fnode_spatial_interaction",
-        "fnode::fnode_spatial_location_data"
+        "fnode::fnode_fnode_spatial_interaction"
       ],
       "height": null
     },
     {
       "name": "Fiber mechanics",
       "function_ids": [
-        "fnode::fnode_bucket_location_data",
         "fnode::fnode_fnode_bucket_interactoin"
       ],
       "height": null
@@ -444,14 +442,14 @@
       "src": "fnode::fnode_spatial_location_data",
       "dst": "fnode::fnode_fnode_spatial_interaction",
       "type": "MessageSpatial3D",
-      "src_layer": "Fiber repulsion",
+      "src_layer": "Spatial location",
       "dst_layer": "Fiber repulsion"
     },
     {
       "src": "fnode::fnode_bucket_location_data",
       "dst": "fnode::fnode_fnode_bucket_interactoin",
       "type": "MessageBucket",
-      "src_layer": "Fiber mechanics",
+      "src_layer": "Bucket location",
       "dst_layer": "Fiber mechanics"
     }
   ],
@@ -469,8 +467,8 @@
       },
       "Bucket location": {
         "fnode": [
-          80.0,
-          337.9997820163486
+          946.8387685290766,
+          336.1315950152083
         ]
       },
       "Fiber-Boundary interaction": {
@@ -513,36 +511,28 @@
           138.0
         ]
       },
-      "Fiber repulsion": {
-        "fnode::fnode_spatial_location_data": [
-          240.6429427792915,
-          703.4276839237059
-        ],
-        "fnode::fnode_fnode_spatial_interaction": [
-          262.3572752043597,
-          785.0710626702996
-        ]
-      },
       "Bucket location": {
         "fnode::fnode_bucket_location_data": [
-          222.0,
-          337.9997820163486
-        ]
-      },
-      "Fiber mechanics": {
-        "fnode::fnode_bucket_location_data": [
-          266.64305177111726,
-          947.57068119891
-        ],
-        "fnode::fnode_fnode_bucket_interactoin": [
-          265.1429972752043,
-          1033.7851771117153
+          778.7197263397949,
+          336.13159501520835
         ]
       },
       "Fiber-Boundary interaction": {
         "fnode::fnode_boundary_interaction": [
           222.5,
           537.9995640326968
+        ]
+      },
+      "Fiber repulsion": {
+        "fnode::fnode_fnode_spatial_interaction": [
+          232.0,
+          741.5707901907357
+        ]
+      },
+      "Fiber mechanics": {
+        "fnode::fnode_fnode_bucket_interactoin": [
+          233.0,
+          991.5707901907357
         ]
       },
       "Movement": {
