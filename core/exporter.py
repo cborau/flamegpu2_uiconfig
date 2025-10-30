@@ -508,10 +508,6 @@ def _render_messages(agents: Sequence[AgentType]) -> tuple[str, set[str]]:
 
             _append_agent_variables_to_message(block_lines, var_name, agent, msg_type)
 
-            if msg_type == "MessageBucket":
-                block_lines.append(
-                    f'{var_name}.newVariableArrayUInt("linked_nodes", {agent.name}_MAX_CONNECTIVITY)'
-                )
 
             block_lines.append(
                 "# TODO: add or remove variables manually to leave only those that need to be reported. If message type is MessageSpatial3D, variables x, y, z are included internally."
@@ -537,13 +533,15 @@ def _append_agent_variables_to_message(
             caster = float if var_type == "ArrayFloat" else int
             values = _parse_array(default, caster)
             length_literal = str(len(values)) if values else "?"
-            block_lines.append(f'{message_var_name}.{method}("{name}", {length_literal})')
+            if length_literal == "?":
+                block_lines.append(
+                    f'{message_var_name}.{method}("{name}", {length_literal}) # ? defines the length of the array variable'
+                )
+            else:
+                block_lines.append(f'{message_var_name}.{method}("{name}", {length_literal})')
         else:
             block_lines.append(f'{message_var_name}.{method}("{name}")')
         handled.add(name)
-
-    if msg_type == "MessageBucket":
-        handled.add("linked_nodes")
 
     skip_for_spatial = {"x", "y", "z"} if msg_type == "MessageSpatial3D" else set()
     for var in getattr(agent, "variables", []):
@@ -575,14 +573,17 @@ def _render_agents(agents: Sequence[AgentType], connections: Sequence[dict]) -> 
             var_type = var.var_type or DEFAULT_VAR_TYPE
             method = _AGENT_VARIABLE_METHODS.get(var_type, _AGENT_VARIABLE_METHODS[DEFAULT_VAR_TYPE])
             if var_type in _ARRAY_TYPES:
-                caster = float if var_type == "ArrayFloat" else int
-                array_values = _parse_array(var.default, caster)
-                array_length = len(array_values)
-                lines.append(f'{agent.name}_agent.{method}("{var_name}", {array_length})')
+                lines.append(
+                    f'{agent.name}_agent.{method}("{var_name}", ?) # ? defines the length of the array variable'
+                )
                 lines.append("# TODO: default array values must be explicitly defined when initializing agent populations")
             else:
-                literal = _format_literal(var_type, var.default)
-                lines.append(f'{agent.name}_agent.{method}("{var_name}", {literal})')
+                default_raw = (getattr(var, "default", "") or "").strip()
+                if default_raw:
+                    literal = _format_literal(var_type, var.default)
+                    lines.append(f'{agent.name}_agent.{method}("{var_name}", {literal})')
+                else:
+                    lines.append(f'{agent.name}_agent.{method}("{var_name}")')
 
         for func in agent.functions:
             base = f'{agent.name}_agent.newRTCFunctionFile("{func.name}", {func.name}_file)'
