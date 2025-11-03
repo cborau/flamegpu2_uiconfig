@@ -1,0 +1,971 @@
+{
+  "agents": [
+    {
+      "name": "bcorner",
+      "color": "#ff0000",
+      "variables": [
+        {
+          "name": "id",
+          "default": "0",
+          "var_type": "Int",
+          "logging": "NoLog"
+        },
+        {
+          "name": "x",
+          "default": "0.0",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "y",
+          "default": "0.0",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "z",
+          "default": "0.0",
+          "var_type": "Float",
+          "logging": "NoLog"
+        }
+      ],
+      "functions": [
+        {
+          "name": "bcorner_output_location_data",
+          "description": "reports boundary corner positions",
+          "input_type": "MessageNone",
+          "output_type": "MessageSpatial3D"
+        },
+        {
+          "name": "bcorner_move",
+          "description": "manages corner movement depending on boundary conditions",
+          "input_type": "MessageNone",
+          "output_type": "MessageNone"
+        }
+      ]
+    },
+    {
+      "name": "fnode",
+      "color": "#ffaa00",
+      "variables": [
+        {
+          "name": "id",
+          "default": "0",
+          "var_type": "Int",
+          "logging": "NoLog"
+        },
+        {
+          "name": "x",
+          "default": "",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "y",
+          "default": "",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "z",
+          "default": "",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "vx",
+          "default": "0.0",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "vy",
+          "default": "0.0",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "vz",
+          "default": "0.0",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "fx",
+          "default": "0.0",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "fy",
+          "default": "0.0",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "fz",
+          "default": "0.0",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "k_elast",
+          "default": "0.0",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "d_dumping",
+          "default": "0.0",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "mass",
+          "default": "",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "boundary_fx",
+          "default": "",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "boundary_fy",
+          "default": "",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "boundary_fz",
+          "default": "",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "f_bx_pos",
+          "default": "",
+          "var_type": "Float",
+          "logging": "Sum"
+        },
+        {
+          "name": "f_bx_neg",
+          "default": "",
+          "var_type": "Float",
+          "logging": "Sum"
+        },
+        {
+          "name": "f_by_pos",
+          "default": "",
+          "var_type": "Float",
+          "logging": "Sum"
+        },
+        {
+          "name": "f_by_neg",
+          "default": "",
+          "var_type": "Float",
+          "logging": "Sum"
+        },
+        {
+          "name": "f_bz_pos",
+          "default": "",
+          "var_type": "Float",
+          "logging": "Sum"
+        },
+        {
+          "name": "f_bz_neg",
+          "default": "",
+          "var_type": "Float",
+          "logging": "Sum"
+        },
+        {
+          "name": "f_bx_pos_y",
+          "default": "",
+          "var_type": "Float",
+          "logging": "Sum"
+        },
+        {
+          "name": "f_bx_pos_z",
+          "default": "",
+          "var_type": "Float",
+          "logging": "Sum"
+        },
+        {
+          "name": "f_bx_neg_y",
+          "default": "",
+          "var_type": "Float",
+          "logging": "Sum"
+        },
+        {
+          "name": "f_bx_neg_z",
+          "default": "",
+          "var_type": "Float",
+          "logging": "Sum"
+        },
+        {
+          "name": "f_by_pos_x",
+          "default": "",
+          "var_type": "Float",
+          "logging": "Sum"
+        },
+        {
+          "name": "f_by_pos_z",
+          "default": "",
+          "var_type": "Float",
+          "logging": "Sum"
+        },
+        {
+          "name": "f_by_neg_x",
+          "default": "",
+          "var_type": "Float",
+          "logging": "Sum"
+        },
+        {
+          "name": "f_by_neg_z",
+          "default": "",
+          "var_type": "Float",
+          "logging": "Sum"
+        },
+        {
+          "name": "f_bz_pos_x",
+          "default": "",
+          "var_type": "Float",
+          "logging": "Sum"
+        },
+        {
+          "name": "f_bz_pos_y",
+          "default": "",
+          "var_type": "Float",
+          "logging": "Sum"
+        },
+        {
+          "name": "f_bz_neg_x",
+          "default": "",
+          "var_type": "Float",
+          "logging": "Sum"
+        },
+        {
+          "name": "f_bz_neg_y",
+          "default": "",
+          "var_type": "Float",
+          "logging": "Sum"
+        },
+        {
+          "name": "f_extension",
+          "default": "",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "f_compression",
+          "default": "",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "elastic_energy",
+          "default": "",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "linked_nodes",
+          "default": "",
+          "var_type": "ArrayFloat",
+          "logging": "NoLog"
+        },
+        {
+          "name": "clamped_bx_pos",
+          "default": "",
+          "var_type": "UInt8",
+          "logging": "NoLog"
+        },
+        {
+          "name": "clamped_bx_neg",
+          "default": "",
+          "var_type": "UInt8",
+          "logging": "NoLog"
+        },
+        {
+          "name": "clamped_by_pos",
+          "default": "",
+          "var_type": "UInt8",
+          "logging": "NoLog"
+        },
+        {
+          "name": "clampled_by_neg",
+          "default": "",
+          "var_type": "UInt8",
+          "logging": "NoLog"
+        },
+        {
+          "name": "clamped_bz_pos",
+          "default": "",
+          "var_type": "UInt8",
+          "logging": "NoLog"
+        },
+        {
+          "name": "clamped_bz_neg",
+          "default": "",
+          "var_type": "UInt8",
+          "logging": "NoLog"
+        }
+      ],
+      "functions": [
+        {
+          "name": "fnode_bucket_location_data",
+          "description": "reports location of fiber nodes for in-fiber interaction",
+          "input_type": "MessageNone",
+          "output_type": "MessageBucket"
+        },
+        {
+          "name": "fnode_spatial_location_data",
+          "description": "reports location of fiber nodes for fiber to fiber interaction",
+          "input_type": "MessageNone",
+          "output_type": "MessageSpatial3D"
+        },
+        {
+          "name": "fnode_boundary_interaction",
+          "description": "to handle fiber interaction vs boundaries",
+          "input_type": "MessageNone",
+          "output_type": "MessageNone"
+        },
+        {
+          "name": "fnode_fnode_bucket_interaction",
+          "description": "in-fiber interaction of nodes",
+          "input_type": "MessageBucket",
+          "output_type": "MessageNone"
+        },
+        {
+          "name": "fnode_fnode_spatial_interaction",
+          "description": "fiber to fiber interactions",
+          "input_type": "MessageSpatial3D",
+          "output_type": "MessageNone"
+        },
+        {
+          "name": "fnode_move",
+          "description": "computes fiber nodes movement",
+          "input_type": "MessageNone",
+          "output_type": "MessageNone"
+        },
+        {
+          "name": "fnode_cell_interaction",
+          "description": "",
+          "input_type": "MessageSpatial3D",
+          "output_type": "MessageNone"
+        },
+        {
+          "name": "",
+          "description": "",
+          "input_type": "MessageNone",
+          "output_type": "MessageNone"
+        }
+      ]
+    },
+    {
+      "name": "ecm_grid",
+      "color": "#55ffff",
+      "variables": [
+        {
+          "name": "id",
+          "default": "0",
+          "var_type": "Int",
+          "logging": "NoLog"
+        },
+        {
+          "name": "x",
+          "default": "0.0",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "y",
+          "default": "0.0",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "z",
+          "default": "0.0",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "grid_i",
+          "default": "",
+          "var_type": "UInt8",
+          "logging": "NoLog"
+        },
+        {
+          "name": "grid_j",
+          "default": "",
+          "var_type": "UInt8",
+          "logging": "NoLog"
+        },
+        {
+          "name": "grid_k",
+          "default": "",
+          "var_type": "UInt8",
+          "logging": "NoLog"
+        }
+      ],
+      "functions": [
+        {
+          "name": "ecm_grid_location_data",
+          "description": "reports ecm grid i,j,k position",
+          "input_type": "MessageNone",
+          "output_type": "MessageArray3D"
+        },
+        {
+          "name": "ecm_grid_boundary_conditions",
+          "description": "manages ecm variables depending on boundary conditions (ej: species concentration)",
+          "input_type": "MessageNone",
+          "output_type": "MessageNone"
+        },
+        {
+          "name": "ecm_grid_spatial_location_data",
+          "description": "reports ecm grid spatial position",
+          "input_type": "MessageNone",
+          "output_type": "MessageSpatial3D"
+        },
+        {
+          "name": "ecm_grid_ecm_grid_interaction",
+          "description": "computes interaction within the ecm grid",
+          "input_type": "MessageArray3D",
+          "output_type": "MessageNone"
+        }
+      ]
+    },
+    {
+      "name": "cell",
+      "color": "#ff557f",
+      "variables": [
+        {
+          "name": "id",
+          "default": "0",
+          "var_type": "Int",
+          "logging": "NoLog"
+        },
+        {
+          "name": "x",
+          "default": "",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "y",
+          "default": "",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "z",
+          "default": "",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "vx",
+          "default": "0.0",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "vy",
+          "default": "0.0",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "vz",
+          "default": "0.0",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "fx",
+          "default": "0.0",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "fy",
+          "default": "0.0",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "fz",
+          "default": "0.0",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "f_extension",
+          "default": "",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "f_compression",
+          "default": "",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "elastic_energy",
+          "default": "",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "k_elast",
+          "default": "",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "d_dumping",
+          "default": "",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "orx",
+          "default": "",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "ory",
+          "default": "",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "orz",
+          "default": "",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "aligment",
+          "default": "",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "radius",
+          "default": "",
+          "var_type": "ArrayUInt",
+          "logging": "NoLog"
+        },
+        {
+          "name": "cycle_phase",
+          "default": "",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "clock",
+          "default": "",
+          "var_type": "Float",
+          "logging": "NoLog"
+        },
+        {
+          "name": "completed_cycles",
+          "default": "",
+          "var_type": "Int",
+          "logging": "NoLog"
+        }
+      ],
+      "functions": [
+        {
+          "name": "cell_spatial_location_data",
+          "description": "reports location of cells",
+          "input_type": "MessageNone",
+          "output_type": "MessageSpatial3D"
+        },
+        {
+          "name": "cell_cell_interaction",
+          "description": "computes interactions with other cell agents",
+          "input_type": "MessageSpatial3D",
+          "output_type": "MessageNone"
+        },
+        {
+          "name": "cell_ecm_grid_interaction",
+          "description": "computes interaction with fixed ecm_grid agents",
+          "input_type": "MessageSpatial3D",
+          "output_type": "MessageNone"
+        },
+        {
+          "name": "cell_fnode_interaction",
+          "description": "computes interactions with nodes of the fibre network",
+          "input_type": "MessageSpatial3D",
+          "output_type": "MessageNone"
+        },
+        {
+          "name": "cell_move",
+          "description": "computes cell movement",
+          "input_type": "MessageNone",
+          "output_type": "MessageNone"
+        }
+      ]
+    }
+  ],
+  "layers": [
+    {
+      "name": "Spatial location",
+      "function_ids": [
+        "bcorner::bcorner_output_location_data",
+        "cell::cell_spatial_location_data",
+        "ecm_grid::ecm_grid_spatial_location_data",
+        "fnode::fnode_spatial_location_data"
+      ],
+      "height": 169.99978201634877
+    },
+    {
+      "name": "Other location",
+      "function_ids": [
+        "ecm_grid::ecm_grid_location_data",
+        "fnode::fnode_bucket_location_data"
+      ],
+      "height": 169.99978201634877
+    },
+    {
+      "name": "Boundary interactions",
+      "function_ids": [
+        "ecm_grid::ecm_grid_boundary_conditions",
+        "fnode::fnode_boundary_interaction"
+      ],
+      "height": 242.3205077999994
+    },
+    {
+      "name": "Fiber repulsion & Species diffusion",
+      "function_ids": [
+        "ecm_grid::ecm_grid_ecm_grid_interaction",
+        "fnode::fnode_fnode_spatial_interaction"
+      ],
+      "height": null
+    },
+    {
+      "name": "Fiber mechanics",
+      "function_ids": [
+        "fnode::fnode_cell_interaction",
+        "fnode::fnode_fnode_bucket_interaction"
+      ],
+      "height": null
+    },
+    {
+      "name": "Cell mechanics",
+      "function_ids": [
+        "cell::cell_cell_interaction",
+        "cell::cell_ecm_grid_interaction",
+        "cell::cell_fnode_interaction"
+      ],
+      "height": 157.49972752043595
+    },
+    {
+      "name": "Movement",
+      "function_ids": [
+        "bcorner::bcorner_move",
+        "cell::cell_move",
+        "fnode::fnode_move"
+      ],
+      "height": null
+    }
+  ],
+  "globals": [
+    {
+      "name": "MAX_CONNECTIVITY",
+      "value": "8",
+      "var_type": "Int",
+      "is_macro": false
+    },
+    {
+      "name": "FIBRE_SEGMENT_K_ELAST",
+      "value": "4.0",
+      "var_type": "Float",
+      "is_macro": false
+    },
+    {
+      "name": "FIBRE_SEGMENT_D_DUMPING",
+      "value": "2.0",
+      "var_type": "Float",
+      "is_macro": false
+    },
+    {
+      "name": "FIBRE_SEGMENT_MASS",
+      "value": "1.0",
+      "var_type": "Float",
+      "is_macro": false
+    },
+    {
+      "name": "FIBRE_SEGMENT_EQUILIBRIUM_DISTANCE",
+      "value": "0.1",
+      "var_type": "Float",
+      "is_macro": false
+    },
+    {
+      "name": "FIBRE_NODE_BOUNDARY_EQUILIBRIUM_DISTANCE",
+      "value": "0.0",
+      "var_type": "Float",
+      "is_macro": false
+    }
+  ],
+  "connections": [
+    {
+      "src": "fnode::fnode_spatial_location_data",
+      "dst": "fnode::fnode_fnode_spatial_interaction",
+      "type": "MessageSpatial3D",
+      "src_layer": "Spatial location",
+      "dst_layer": "Fiber repulsion"
+    },
+    {
+      "src": "ecm_grid::ecm_grid_location_data",
+      "dst": "ecm_grid::ecm_grid_ecm_grid_interaction",
+      "type": "MessageArray3D",
+      "src_layer": "Other location",
+      "dst_layer": "Fiber repulsion & Species diffusion"
+    },
+    {
+      "src": "cell::cell_spatial_location_data",
+      "dst": "fnode::fnode_cell_interaction",
+      "type": "MessageSpatial3D",
+      "src_layer": "Spatial location",
+      "dst_layer": "Fiber mechanics"
+    },
+    {
+      "src": "fnode::fnode_bucket_location_data",
+      "dst": "fnode::fnode_fnode_bucket_interaction",
+      "type": "MessageBucket",
+      "src_layer": "Other location",
+      "dst_layer": "Fiber mechanics"
+    },
+    {
+      "src": "cell::cell_spatial_location_data",
+      "dst": "cell::cell_cell_interaction",
+      "type": "MessageSpatial3D",
+      "src_layer": "Spatial location",
+      "dst_layer": "Cell mechanics"
+    },
+    {
+      "src": "ecm_grid::ecm_grid_spatial_location_data",
+      "dst": "cell::cell_ecm_grid_interaction",
+      "type": "MessageSpatial3D",
+      "src_layer": "Spatial location",
+      "dst_layer": "Cell mechanics"
+    },
+    {
+      "src": "fnode::fnode_spatial_location_data",
+      "dst": "cell::cell_fnode_interaction",
+      "type": "MessageSpatial3D",
+      "src_layer": "Spatial location",
+      "dst_layer": "Cell mechanics"
+    }
+  ],
+  "manual_layout": {
+    "agents": {
+      "Spatial location": {
+        "bcorner": [
+          80.0,
+          138.0
+        ],
+        "cell": [
+          455.3555302166476,
+          135.4181350218574
+        ],
+        "ecm_grid": [
+          884.6419612314712,
+          132.148807769862
+        ],
+        "fnode": [
+          1246.532725199544,
+          133.7965792474344
+        ]
+      },
+      "Other location": {
+        "ecm_grid": [
+          332.2052451539339,
+          308.3292055216726
+        ],
+        "fnode": [
+          988.883238312429,
+          325.703344632277
+        ]
+      },
+      "Boundary interactions": {
+        "ecm_grid": [
+          79.99999999999989,
+          598.853592163028
+        ],
+        "fnode": [
+          81.31128848346657,
+          512.4499433602914
+        ]
+      },
+      "Fiber repulsion & Species diffusion": {
+        "ecm_grid": [
+          80.0,
+          810.320071832697
+        ],
+        "fnode": [
+          1238.5872291904216,
+          831.3371755955246
+        ]
+      },
+      "Fiber mechanics": {
+        "fnode": [
+          80.0,
+          1060.320071832698
+        ]
+      },
+      "Cell mechanics": {
+        "cell": [
+          551.7172177879133,
+          1295.416571852892
+        ]
+      },
+      "Movement": {
+        "bcorner": [
+          80.0,
+          1497.819799353133
+        ],
+        "cell": [
+          428.0,
+          1497.819799353133
+        ],
+        "fnode": [
+          753.0,
+          1497.819799353133
+        ]
+      }
+    },
+    "functions": {
+      "Spatial location": {
+        "bcorner::bcorner_output_location_data": [
+          227.0,
+          138.0
+        ],
+        "cell::cell_spatial_location_data": [
+          681.8637400228052,
+          133.5499480207171
+        ],
+        "ecm_grid::ecm_grid_spatial_location_data": [
+          1066.8681870011399,
+          132.14880776986192
+        ],
+        "fnode::fnode_spatial_location_data": [
+          1398.7418472063857,
+          133.79657924743452
+        ]
+      },
+      "Other location": {
+        "ecm_grid::ecm_grid_location_data": [
+          509.40992018244026,
+          308.32920552167263
+        ],
+        "fnode::fnode_bucket_location_data": [
+          826.462166476625,
+          325.7033446322768
+        ]
+      },
+      "Boundary interactions": {
+        "ecm_grid::ecm_grid_boundary_conditions": [
+          221.65906499429872,
+          598.8535921630281
+        ],
+        "fnode::fnode_boundary_interaction": [
+          214.470353477765,
+          512.4499433602912
+        ]
+      },
+      "Fiber repulsion & Species diffusion": {
+        "ecm_grid::ecm_grid_ecm_grid_interaction": [
+          230.5,
+          810.320071832697
+        ],
+        "fnode::fnode_fnode_spatial_interaction": [
+          1411.60433295325,
+          831.3371755955246
+        ]
+      },
+      "Fiber mechanics": {
+        "fnode::fnode_cell_interaction": [
+          276.0570125427594,
+          1043.6553055841232
+        ],
+        "fnode::fnode_fnode_bucket_interaction": [
+          340.4207525655644,
+          1123.6895131097804
+        ]
+      },
+      "Cell mechanics": {
+        "cell::cell_cell_interaction": [
+          729.5980615735463,
+          1243.40516934434
+        ],
+        "cell::cell_ecm_grid_interaction": [
+          878.2063854047892,
+          1288.4108705986164
+        ],
+        "cell::cell_fnode_interaction": [
+          1004.6499429874573,
+          1333.416571852892
+        ]
+      },
+      "Movement": {
+        "bcorner::bcorner_move": [
+          186.0,
+          1497.819799353133
+        ],
+        "cell::cell_move": [
+          522.5,
+          1497.819799353133
+        ],
+        "fnode::fnode_move": [
+          854.0,
+          1497.819799353133
+        ]
+      }
+    }
+  },
+  "visualization": {
+    "activated": true,
+    "domain_width": "1",
+    "begin_paused": true,
+    "show_domain_boundaries": true,
+    "agents": [
+      {
+        "agent_name": "bcorner",
+        "include": true,
+        "shape": "ICOSPHERE",
+        "color_mode": "Solid",
+        "interpolation": null
+      },
+      {
+        "agent_name": "cell",
+        "include": false,
+        "shape": "ICOSPHERE",
+        "color_mode": "Solid",
+        "interpolation": null
+      },
+      {
+        "agent_name": "ecm_grid",
+        "include": false,
+        "shape": "ICOSPHERE",
+        "color_mode": "Solid",
+        "interpolation": null
+      },
+      {
+        "agent_name": "fnode",
+        "include": true,
+        "shape": "ICOSPHERE",
+        "color_mode": "Solid",
+        "interpolation": null
+      }
+    ]
+  }
+}
