@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import List, Optional
 
-VAR_TYPE_OPTIONS = ["UInt8", "Int", "Float", "ArrayUInt", "ArrayFloat"]
+VAR_TYPE_OPTIONS = ["UInt8","UInt16","UInt32", "Int", "Float", "ArrayUInt", "ArrayFloat"]
 DEFAULT_VAR_TYPE = "Float"
 SHAPE_VAR_TYPE = "Shape"
 GLOBAL_VAR_TYPE_OPTIONS = VAR_TYPE_OPTIONS + [SHAPE_VAR_TYPE]

@@ -1,5 +1,6 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QTableWidget, QTableWidgetItem, QComboBox
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QHeaderView
 from core.models import GlobalVariable, DEFAULT_VAR_TYPE, GLOBAL_VAR_TYPE_OPTIONS
 
@@ -9,11 +10,12 @@ class GlobalsTab(QWidget):
         layout = QVBoxLayout(self)
 
         layout.addWidget(QLabel("Global Variables (name, type, value | shape):"))
-        self.globals_table = QTableWidget(0, 4)
-        self.globals_table.setHorizontalHeaderLabels(["Name", "Type", "Value | Shape", "MacroProperty"])
+        self.globals_table = QTableWidget(0, 5)
+        self.globals_table.setHorizontalHeaderLabels(["Name", "Type", "Value | Shape", "MacroProperty", ""])
         self.globals_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
         self.globals_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
         self.globals_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        self.globals_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
         value_header = self.globals_table.horizontalHeaderItem(2)
         if value_header:
             value_header.setToolTip(
@@ -35,6 +37,9 @@ class GlobalsTab(QWidget):
         self.globals_table.setCellWidget(row, 1, combo)
         self.globals_table.setItem(row, 2, QTableWidgetItem(""))
         self.globals_table.setItem(row, 3, self._make_macro_item(False))
+        btn = self._make_delete_button(self.globals_table)
+        btn.clicked.connect(lambda _, b=btn: self._remove_table_row(self.globals_table, b))
+        self.globals_table.setCellWidget(row, 4, btn)
 
     def get_globals(self):
         globals_list = []
@@ -62,6 +67,9 @@ class GlobalsTab(QWidget):
             self.globals_table.setCellWidget(row, 1, combo)
             self.globals_table.setItem(row, 2, QTableWidgetItem(glob.value))
             self.globals_table.setItem(row, 3, self._make_macro_item(getattr(glob, "is_macro", False)))
+            btn = self._make_delete_button(self.globals_table)
+            btn.clicked.connect(lambda _, b=btn: self._remove_table_row(self.globals_table, b))
+            self.globals_table.setCellWidget(row, 4, btn)
 
     def clear_globals(self):
         self.globals_table.setRowCount(0)
@@ -82,3 +90,19 @@ class GlobalsTab(QWidget):
         item.setCheckState(Qt.Checked if checked else Qt.Unchecked)
         item.setText("")
         return item
+
+    def _make_delete_button(self, table):
+        btn = QPushButton()
+        icon = QIcon.fromTheme("edit-delete")
+        if icon.isNull():
+            btn.setText("🗑")
+        else:
+            btn.setIcon(icon)
+        return btn
+
+    def _remove_table_row(self, table, button):
+        for r in range(table.rowCount()):
+            for c in range(table.columnCount()):
+                if table.cellWidget(r, c) is button:
+                    table.removeRow(r)
+                    return

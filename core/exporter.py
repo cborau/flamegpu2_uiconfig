@@ -28,6 +28,8 @@ _ENV_PROPERTY_METHODS: dict[str, str] = {
     "Float": "newPropertyFloat",
     "Int": "newPropertyInt",
     "UInt8": "newPropertyUInt",
+    "UInt16": "newPropertyUInt",
+    "UInt32": "newPropertyUInt",
     "ArrayFloat": "newPropertyArrayFloat",
     "ArrayInt": "newPropertyArrayInt",
     "ArrayUInt": "newPropertyArrayUInt",
@@ -38,6 +40,8 @@ _MACRO_PROPERTY_METHODS: dict[str, str] = {
     "ArrayFloat": "newMacroPropertyFloat",
     "Int": "newMacroPropertyInt",
     "UInt8": "newMacroPropertyInt",
+    "UInt16": "newMacroPropertyInt",
+    "UInt32": "newMacroPropertyInt",
     "ArrayInt": "newMacroPropertyInt",
     "ArrayUInt": "newMacroPropertyInt",
 }
@@ -47,6 +51,8 @@ _MACRO_PROPERTY_ACCESSORS: dict[str, str] = {
     "ArrayFloat": "getMacroPropertyFloat",
     "Int": "getMacroPropertyInt",
     "UInt8": "getMacroPropertyInt",
+    "UInt16": "getMacroPropertyInt",
+    "UInt32": "getMacroPropertyInt",
     "ArrayInt": "getMacroPropertyInt",
     "ArrayUInt": "getMacroPropertyInt",
     SHAPE_VAR_TYPE: "getMacroPropertyFloat",
@@ -56,6 +62,8 @@ _AGENT_VARIABLE_METHODS: dict[str, str] = {
     "Float": "newVariableFloat",
     "Int": "newVariableInt",
     "UInt8": "newVariableUInt8",
+    "UInt16": "newVariableUInt16",
+    "UInt32": "newVariableUInt32",
     "ArrayFloat": "newVariableArrayFloat",
     "ArrayInt": "newVariableArrayInt",
     "ArrayUInt": "newVariableArrayUInt",
@@ -820,7 +828,7 @@ def _format_literal(var_type: str | None, raw_value: str | None) -> str:
     if var_type == SHAPE_VAR_TYPE:
         dims = _parse_shape_tokens(raw)
         if not dims:
-            return "?"
+            return raw or "?"
         formatted: list[str] = []
         for token in dims:
             if isinstance(token, str):
@@ -830,13 +838,24 @@ def _format_literal(var_type: str | None, raw_value: str | None) -> str:
         return ", ".join(formatted)
     if var_type in _ARRAY_TYPES:
         items = _parse_array(raw, float if var_type == "ArrayFloat" else int)
+        if not items and raw:
+            return raw
         return "[" + ", ".join(_format_number(item) for item in items) + "]"
     if var_type == "Int":
-        return str(_parse_int(raw))
-    if var_type == "UInt8":
-        return str(max(0, min(255, _parse_int(raw))))
+        parsed = _parse_int(raw)
+        if parsed == 0 and raw and raw.strip() not in {"0", "0.0"}:
+            return raw
+        return str(parsed)
+    if var_type in {"UInt8", "UInt16", "UInt32"}:
+        parsed = _parse_int(raw)
+        if parsed == 0 and raw and raw.strip() not in {"0", "0.0"}:
+            return raw
+        return str(max(0, parsed))
     # Default to float
-    return _format_number(_parse_float(raw))
+    parsed = _parse_float(raw)
+    if parsed == 0.0 and raw and raw.strip() not in {"0", "0.0"}:
+        return raw
+    return _format_number(parsed)
 
 
 def _parse_array(raw: str | None, caster) -> list:

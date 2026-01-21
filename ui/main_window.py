@@ -14,6 +14,7 @@ from ui.canvas.canvas_view import CanvasView
 from core.signals import signals
 from core.storage import save_config, load_config
 from core.exporter import export_model_files
+from core.importer import import_project_file
 from core.ui_helpers import show_quiet_message
 
 class MainWindow(QMainWindow):
@@ -59,6 +60,7 @@ class MainWindow(QMainWindow):
 
         self._config_dir = (Path(__file__).resolve().parent.parent / "configs").resolve()
         self._config_dir.mkdir(parents=True, exist_ok=True)
+        self._root_config_dir = self._config_dir
 
         self._init_menus()
 
@@ -78,6 +80,9 @@ class MainWindow(QMainWindow):
 
         save_action = file_menu.addAction("Save Configuration…")
         save_action.triggered.connect(self._save_configuration)
+        
+        import_action = file_menu.addAction("Import Project…")
+        import_action.triggered.connect(self._import_project)
 
         help_menu = self.menuBar().addMenu("&Help")
         self._add_help_link(help_menu, "FLAME GPU 2 Docs", "https://docs.flamegpu.com/")
@@ -177,7 +182,34 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             QMessageBox.critical(self, "Load Failed", f"Could not load configuration:\n{exc}")
             return
+        self._apply_loaded_config(agents, layers, globals_, connections, manual_layout, visualization)
 
+        show_quiet_message(self, "Loaded", f"Configuration loaded from:\n{filename}")
+
+    def _import_project(self):
+        filename, _ = QFileDialog.getOpenFileName(
+            self,
+            "Import Project",
+            str(self._config_dir),
+            "Python Files (*.py)"
+        )
+        if not filename:
+            return
+
+        try:
+            agents, layers, globals_, connections, manual_layout, visualization = import_project_file(Path(filename))
+            self._root_config_dir.mkdir(parents=True, exist_ok=True)
+            config_path = self._root_config_dir / f"{Path(filename).stem}.json"
+            save_config(str(config_path), agents, layers, globals_, connections, manual_layout, visualization)
+            self._config_dir = self._root_config_dir
+        except Exception as exc:
+            QMessageBox.critical(self, "Import Failed", f"Could not import project:\n{exc}")
+            return
+
+        self._apply_loaded_config(agents, layers, globals_, connections, manual_layout, visualization)
+        show_quiet_message(self, "Imported", f"Configuration saved to:\n{config_path}")
+
+    def _apply_loaded_config(self, agents, layers, globals_, connections, manual_layout, visualization) -> None:
         # Remove existing agents and reset state
         existing_agents = self.model_tab.get_agents()
         for agent in existing_agents:
@@ -215,5 +247,3 @@ class MainWindow(QMainWindow):
             self.layers_tab.layer_table.selectRow(0)
 
         signals.redraw_canvas.emit()
-
-        show_quiet_message(self, "Loaded", f"Configuration loaded from:\n{filename}")
