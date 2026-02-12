@@ -609,13 +609,13 @@ def _render_agents(agents: Sequence[AgentType], connections: Sequence[dict]) -> 
             if func.output_type != "MessageNone":
                 msg_key = _MESSAGE_TYPE_KEYS.get(func.output_type)
                 if msg_key:
-                    suffix += f'.setMessageOutput("{agent.name}_{msg_key}_location_message ")'
+                    suffix += f'.setMessageOutput("{agent.name}_{msg_key}_location_message")'
             if func.input_type != "MessageNone":
                 msg_key = _MESSAGE_TYPE_KEYS.get(func.input_type)
                 source_agent = _input_source_agent(agent.name, func.name, func.input_type, input_map)
                 missing_input = False
                 if msg_key and source_agent:
-                    suffix += f'.setMessageInput("{source_agent}_{msg_key}_location_message ")'
+                    suffix += f'.setMessageInput("{source_agent}_{msg_key}_location_message")'
                 elif msg_key:
                     missing_input = True
                 if missing_input:
