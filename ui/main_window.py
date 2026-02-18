@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices, QIcon
 from pathlib import Path
+import json
 from ui.tabs.agent_config_tab import AgentConfigTab
 from ui.tabs.globals_tab import GlobalsTab
 from ui.tabs.layers_tab import LayersTab
@@ -16,6 +17,7 @@ from core.storage import save_config, load_config
 from core.exporter import export_model_files
 from core.importer import import_project_file
 from core.ui_helpers import show_quiet_message
+from export_functions_excel import build_rows, write_excel
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -61,6 +63,7 @@ class MainWindow(QMainWindow):
         self._config_dir = (Path(__file__).resolve().parent.parent / "configs").resolve()
         self._config_dir.mkdir(parents=True, exist_ok=True)
         self._root_config_dir = self._config_dir
+        self._current_config_path = None
 
         self._init_menus()
 
@@ -80,6 +83,9 @@ class MainWindow(QMainWindow):
 
         save_action = file_menu.addAction("Save Configuration…")
         save_action.triggered.connect(self._save_configuration)
+
+        export_excel_action = file_menu.addAction("Export Function Matrix (Excel)…")
+        export_excel_action.triggered.connect(self._export_function_matrix_excel)
         
         import_action = file_menu.addAction("Import Project…")
         import_action.triggered.connect(self._import_project)
@@ -109,6 +115,7 @@ class MainWindow(QMainWindow):
             agents, layers, globals_, connections, manual_layout, visualization = self._collect_configuration_data()
             save_config(filename, agents, layers, globals_, connections, manual_layout, visualization)
             self._config_dir = Path(filename).resolve().parent
+            self._current_config_path = Path(filename).resolve()
         except Exception as exc:
             QMessageBox.critical(self, "Save Failed", f"Could not save configuration:\n{exc}")
             return
@@ -117,6 +124,46 @@ class MainWindow(QMainWindow):
 
     def _open_url(self, url: str) -> None:
         QDesktopServices.openUrl(QUrl(url))
+
+    def _export_function_matrix_excel(self):
+        if self._current_config_path is None or not self._current_config_path.exists():
+            reply = QMessageBox.question(
+                self,
+                "Save Configuration First",
+                "Function matrix export uses the saved JSON configuration.\n"
+                "Save the current configuration first?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes,
+            )
+            if reply != QMessageBox.Yes:
+                return
+
+            self._save_configuration()
+            if self._current_config_path is None or not self._current_config_path.exists():
+                return
+
+        config_path = self._current_config_path
+        filename, _ = QFileDialog.getSaveFileName(
+            self,
+            "Export Function Matrix (Excel)",
+            str(config_path.with_name(f"{config_path.stem}_functions.xlsx")),
+            "Excel Files (*.xlsx)"
+        )
+        if not filename:
+            return
+        if not filename.lower().endswith(".xlsx"):
+            filename += ".xlsx"
+
+        try:
+            with config_path.open("r", encoding="utf-8") as file:
+                config_data = json.load(file)
+            rows = build_rows(config_data)
+            write_excel(rows, Path(filename).resolve())
+        except Exception as exc:
+            QMessageBox.critical(self, "Export Failed", f"Could not export function matrix:\n{exc}")
+            return
+
+        show_quiet_message(self, "Exported", f"Function matrix saved to:\n{filename}")
 
     def _collect_configuration_data(self):
         agents = self.model_tab.get_agents()
@@ -146,6 +193,7 @@ class MainWindow(QMainWindow):
             agents, layers, globals_, connections, manual_layout, visualization = self._collect_configuration_data()
             save_config(filename, agents, layers, globals_, connections, manual_layout, visualization)
             self._config_dir = Path(filename).resolve().parent
+            self._current_config_path = Path(filename).resolve()
             model_name = Path(filename).stem
             generated_path = export_model_files(
                 model_name=model_name,
@@ -182,6 +230,7 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             QMessageBox.critical(self, "Load Failed", f"Could not load configuration:\n{exc}")
             return
+        self._current_config_path = Path(filename).resolve()
         self._apply_loaded_config(agents, layers, globals_, connections, manual_layout, visualization)
 
         show_quiet_message(self, "Loaded", f"Configuration loaded from:\n{filename}")
@@ -202,6 +251,7 @@ class MainWindow(QMainWindow):
             config_path = self._root_config_dir / f"{Path(filename).stem}.json"
             save_config(str(config_path), agents, layers, globals_, connections, manual_layout, visualization)
             self._config_dir = self._root_config_dir
+            self._current_config_path = config_path.resolve()
         except Exception as exc:
             QMessageBox.critical(self, "Import Failed", f"Could not import project:\n{exc}")
             return

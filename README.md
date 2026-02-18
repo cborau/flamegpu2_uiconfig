@@ -50,6 +50,37 @@ python main.py
 
 The main window opens with a tabbed editor on the left and a topology canvas on the right.
 
+## Export Function Matrix to Excel
+
+You can export a function-level Excel table from any config JSON with:
+
+```bash
+python export_functions_excel.py
+```
+
+When no config path is provided, a file browser opens so you can choose the JSON file.
+
+Optional output path:
+
+```bash
+python export_functions_excel.py path/to/config.json -o exports/config_functions.xlsx
+```
+
+The workbook includes these columns:
+
+- Layer name
+- Function name
+- Input type
+- Output type
+
+You can also export directly from the UI via **File → Export Function Matrix (Excel)…**.
+
+Cell colors:
+
+- Function name background uses the owner agent color.
+- Input type background uses the sender agent color (when input is not `MessageNone`).
+- Output type background uses the owner agent color (when output is not `MessageNone`).
+
 [IMAGE HERE: MAIN WINDOW WITH TABS]
 
 ## Quick Start Workflow

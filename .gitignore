@@ -206,13 +206,10 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 TODO.txt
-configs/example2.json
+configs/
 core/templates/InstructionsCo.txt
-configs/example3.json
 .vscode/settings.json
 core/templates/InstructionCo2.txt
 ui/assets/icon.ai
-configs/example4.json
 model_files/
-configs/example5.json
 core/templates/InstructionsCo3.txt
