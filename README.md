@@ -1,8 +1,12 @@
+
+<div align="center">
+   <img src="ui/assets/icon.png" alt="Icon" height="80"/>
+</div>
+
 # FLAME GPU 2 Visual Configurator
 
 A desktop tool for assembling FLAME GPU 2 model configurations to minimize hand-editing. Define agents, globals, layers, logging, and visualization settings through a Qt UI and export ready-to-edit Python and C++ files.
-
-[IMAGE HERE: APPLICATION OVERVIEW]
+   
 
 ## Features
 
