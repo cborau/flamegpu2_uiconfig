@@ -50,52 +50,21 @@ python main.py
 
 The main window opens with a tabbed editor on the left and a topology canvas on the right.
 
-## Export Function Matrix to Excel
-
-You can export a function-level Excel table from any config JSON with:
-
-```bash
-python export_functions_excel.py
-```
-
-When no config path is provided, a file browser opens so you can choose the JSON file.
-
-Optional output path:
-
-```bash
-python export_functions_excel.py path/to/config.json -o exports/config_functions.xlsx
-```
-
-The workbook includes these columns:
-
-- Layer name
-- Function name
-- Input type
-- Output type
-
-You can also export directly from the UI via **File → Export Function Matrix (Excel)…**.
-
-Cell colors:
-
-- Function name background uses the owner agent color.
-- Input type background uses the sender agent color (when input is not `MessageNone`).
-- Output type background uses the owner agent color (when output is not `MessageNone`).
-
-[IMAGE HERE: MAIN WINDOW WITH TABS]
-
 ## Quick Start Workflow
 
 1. **Create agents**
    - Open the **Agent Config.** tab.
-   - Enter an agent name, assign a colour, and add variables.
+   - Enter an agent name, assign a colour, and add variables. You can use templates from previously created agents, or agents loaded from a config file.
    - For each variable choose a type and a logging mode (e.g. *Mean*, *Min*).
    - Add runtime functions and specify message input/output types.
 
-   [IMAGE HERE: AGENT CONFIG TAB]
+   ![](ui/assets/FigConfig1.png)
 
 2. **Manage globals**
    - Switch to **Globals**.
    - Add global entries with type, value, and indicate if they are *MacroProperty* (checked).
+
+   ![](ui/assets/FigConfig2.png)
 
 3. **Build layers**
    - Use **Layers** to place functions in execution order.
@@ -105,7 +74,7 @@ Cell colors:
    - On the canvas (right panel), draw message connections between function nodes when needed.
    - Toggle manual layout to reposition nodes.
 
-   [IMAGE HERE: CANVAS WITH CONNECTIONS]
+   ![](ui/assets/VideoConfig.gif)
 
 5. **Configure visualization**
    - Open the **Visualization** tab.
@@ -114,16 +83,13 @@ Cell colors:
    - In the agent table, choose which agents to include, select shapes (`ICOSPHERE`, `CUBE`, `PYRAMID`, `ARROWHEAD`), and colour mode (`Solid` or `Interpolated`).
    - For interpolated colours, pick variables and numeric ranges in the lower panel.
 
-   [IMAGE HERE: VISUALIZATION TAB]
-
 6. **Review model summary**
    - The **Model** tab lists defined agents; you can tweak variable defaults or function descriptions here and apply changes back to the templates.
 
 7. **Save or export**
    - **File → Save Configuration…** stores everything as JSON (including visualization + logging choices) in the `configs/` directory.
-   - **File → Save Configuration For Export…** both saves the JSON and generates a Python scaffold in `model_files/` using the FLAME GPU 2 template.
+   - **File → Save Configuration For Export…** both saves the JSON and generates a Python scaffold in `model_files/` using a predefined template, as well as all agent functions in separated Cpp files.
 
-[IMAGE HERE: EXPORT DIALOG]
 
 ## Configuration Files
 
@@ -132,7 +98,10 @@ Cell colors:
   - Global parameters with macro flags.
   - Layer ordering and canvas layout.
   - Visualization settings (domain, shapes, colour modes, interpolation values).
-- Exported Python files fill the template placeholders for globals, agents, logging setup, and visualization blocks.
+- Exported Python main file fills the template placeholders for globals, agents, logging setup, and visualization blocks, including agent function intercommunication setup. 
+- Exported Cpp files include getters and setters for all the calling agent's variables. The user must code the corresponding function behaviour. 
+
+   ![](ui/assets/FigConfig3.png)
 
 ## Tips & Best Practices
 
